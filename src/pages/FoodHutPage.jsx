@@ -32,8 +32,8 @@ export default function FoodHutPage() {
   const prepared = sales.filter(s => s.actionType === 'PREPARED')
   const remaining = sales.filter(s => s.actionType === 'REMAINING')
 
-  const preparedTotal = prepared.reduce((sum, s) => sum + (s.quantity * s.price), 0)
-  const remainingTotal = remaining.reduce((sum, s) => sum + (s.quantity * s.price), 0)
+  const preparedTotal = prepared.reduce((sum, s) => sum + ((s.preparedQty || 0) * (s.price || 0)), 0)
+  const remainingTotal = remaining.reduce((sum, s) => sum + ((s.remainingQty || 0) * (s.price || 0)), 0)
   const soldTotal = preparedTotal - remainingTotal
 
   return (
@@ -83,7 +83,7 @@ export default function FoodHutPage() {
             </h2>
             {prepared.length === 0
               ? <EmptyState icon={UtensilsCrossed} title="No prepared items" />
-              : prepared.map((s, i) => <SaleRow key={i} sale={s} color="text-[#21C36F]" />)
+              : prepared.map((s, i) => <SaleRow key={i} sale={s} qty={s.preparedQty} color="text-[#21C36F]" />)
             }
           </div>
 
@@ -94,7 +94,7 @@ export default function FoodHutPage() {
             </h2>
             {remaining.length === 0
               ? <EmptyState icon={UtensilsCrossed} title="No remaining items" />
-              : remaining.map((s, i) => <SaleRow key={i} sale={s} color="text-orange-500" />)
+              : remaining.map((s, i) => <SaleRow key={i} sale={s} qty={s.remainingQty} color="text-orange-500" />)
             }
           </div>
 
@@ -120,7 +120,7 @@ export default function FoodHutPage() {
   )
 }
 
-function SaleRow({ sale, color }) {
+function SaleRow({ sale, qty, color }) {
   return (
     <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
       <div>
@@ -128,7 +128,7 @@ function SaleRow({ sale, color }) {
         <p className="text-xs text-gray-400">{sale.variation}</p>
       </div>
       <div className="text-right">
-        <p className={`text-sm font-bold ${color}`}>{sale.quantity}×</p>
+        <p className={`text-sm font-bold ${color}`}>{qty ?? 0}×</p>
         <p className="text-xs text-gray-400">Rs {sale.price}</p>
       </div>
     </div>

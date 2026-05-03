@@ -2,7 +2,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   LayoutDashboard, Store, Users, CreditCard, UtensilsCrossed,
-  BarChart3, Shield, Settings, LogOut, ChevronRight, Menu, X
+  BarChart3, Shield, Settings, LogOut, ChevronRight, Menu, X, CalendarDays
 } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
@@ -10,6 +10,7 @@ import clsx from 'clsx'
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
   { to: '/shops', label: 'Shops', icon: Store },
+  { to: '/monthly', label: 'Monthly Summary', icon: CalendarDays },
   { to: '/staff', label: 'Staff & HR', icon: Users },
   { to: '/credits', label: 'Credits', icon: CreditCard },
   { to: '/foodhut', label: 'Food Hut', icon: UtensilsCrossed },

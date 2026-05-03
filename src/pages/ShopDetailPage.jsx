@@ -1,9 +1,10 @@
 import { useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw } from 'lucide-react'
-import { transactionApi } from '../services/api.js'
-import { PageHeader, LoadingSpinner, formatRs, EmptyState } from '../components/ui.jsx'
+import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw, CreditCard, CheckCircle } from 'lucide-react'
+import { transactionApi, dailyCashApi, creditApi } from '../services/api.js'
+import { PageHeader, LoadingSpinner, formatRs, EmptyState, Badge } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
+import { formatSLShort } from '../utils/timezone.js'
 
 const SHOP_META = {
   CAFE: { label: 'Cafe', color: '#068A4B', bg: 'bg-[#068A4B]' },
@@ -17,7 +18,9 @@ export default function ShopDetailPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [summary, setSummary] = useState(null)
   const [transactions, setTransactions] = useState([])
+  const [shopCredits, setShopCredits] = useState([])
   const [loading, setLoading] = useState(true)
+  const [markingPaid, setMarkingPaid] = useState(null)
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
@@ -25,18 +28,40 @@ export default function ShopDetailPage() {
     setLoading(true)
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
     try {
-      const [s, t] = await Promise.allSettled([
-        transactionApi.getDepartmentSummary(shopCode, dateStr),
+      const [s, t, c] = await Promise.allSettled([
+        dailyCashApi.getSummary(shopCode, dateStr).then(r => {
+          const d = r.data
+          return {
+            openingBalance: d.openingCash,
+            closingBalance: d.closingCash,
+            totalExpenses: d.totalExpenses,
+            totalCredits: d.totalCredits,
+            calculatedSales: d.totalSales,
+            profit: d.totalSales != null ? d.totalSales * ({ CAFE: 0.12, BOOKSHOP: 0.15, FOODHUT: 0.20 }[shopCode?.toUpperCase()] || 0.10) : 0,
+          }
+        }),
         transactionApi.getByDate(shopCode, dateStr),
+        creditApi.getByShop(shopCode, dateStr),
       ])
-      if (s.status === 'fulfilled') setSummary(s.value.data)
+      if (s.status === 'fulfilled') setSummary(s.value)
       if (t.status === 'fulfilled') setTransactions(t.value.data || [])
+      if (c.status === 'fulfilled') setShopCredits(c.value.data?.credits || [])
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => { load() }, [shopCode, selectedDate])
+
+  const markCreditPaid = async (id) => {
+    setMarkingPaid(id)
+    try {
+      await creditApi.markPaid(id)
+      await load()
+    } finally {
+      setMarkingPaid(null)
+    }
+  }
 
   return (
     <div>
@@ -85,7 +110,7 @@ export default function ShopDetailPage() {
           )}
 
           {/* Transactions Table */}
-          <div className="card">
+          <div className="card mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="font-semibold text-gray-800">Transactions ({transactions.length})</h2>
               <button onClick={load} className="text-gray-400 hover:text-gray-600">
@@ -103,7 +128,8 @@ export default function ShopDetailPage() {
                       <th className="pb-3 pr-4 font-medium">Item / Category</th>
                       <th className="pb-3 pr-4 font-medium text-right">Amount</th>
                       <th className="pb-3 pr-4 font-medium">Comment</th>
-                      <th className="pb-3 font-medium">By</th>
+                      <th className="pb-3 pr-4 font-medium">Time (SLT)</th>
+                      <th className="pb-3 font-medium">Entered By</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -119,19 +145,76 @@ export default function ShopDetailPage() {
                           </span>
                         </td>
                         <td className="py-3 pr-4 font-medium text-gray-700">
-                          {t.itemName || t.expenseTypeName || '—'}
+                          {t.itemName || t.item || t.expenseTypeName || '—'}
                         </td>
                         <td className="py-3 pr-4 text-right font-semibold">
                           {formatRs(t.amount)}
                         </td>
-                        <td className="py-3 pr-4 text-gray-500 max-w-[160px] truncate">
+                        <td className="py-3 pr-4 text-gray-500 max-w-[140px] truncate">
                           {t.comment || '—'}
                         </td>
-                        <td className="py-3 text-gray-400 text-xs">{t.recordedBy || '—'}</td>
+                        <td className="py-3 pr-4 text-gray-400 text-xs whitespace-nowrap">
+                          {formatSLShort(t.transactionTime || t.createdAt)}
+                        </td>
+                        <td className="py-3 text-gray-600 text-xs font-medium">
+                          {t.recordedByName || t.recordedBy || '—'}
+                        </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+          </div>
+
+          {/* Credits Section */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-800 flex items-center gap-2">
+                <CreditCard size={16} className="text-orange-500" />
+                Credits ({shopCredits.length})
+                {shopCredits.some(c => !c.isPaid) && (
+                  <span className="text-xs font-normal text-red-500 ml-1">
+                    — {formatRs(shopCredits.filter(c => !c.isPaid).reduce((s, c) => s + (c.amount || 0), 0))} unpaid
+                  </span>
+                )}
+              </h2>
+            </div>
+            {shopCredits.length === 0 ? (
+              <EmptyState icon={CreditCard} title="No credits" description="No credit entries for this date" />
+            ) : (
+              <div className="space-y-3">
+                {shopCredits.map((c) => (
+                  <div key={c.id} className={`flex items-start gap-4 p-3 rounded-xl border ${
+                    c.isPaid ? 'bg-gray-50 border-gray-100 opacity-70' : 'bg-orange-50 border-orange-100'
+                  }`}>
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-semibold text-gray-800 text-sm">{c.userName || 'Unknown'}</span>
+                        {c.isPaid
+                          ? <Badge color="green">✓ Paid</Badge>
+                          : <Badge color="red">Unpaid</Badge>
+                        }
+                      </div>
+                      <p className="text-xs text-gray-500 mt-0.5">{c.reason || 'No reason provided'}</p>
+                    </div>
+                    <div className="text-right shrink-0 flex flex-col items-end gap-1">
+                      <p className={`text-base font-bold ${c.isPaid ? 'text-gray-400 line-through' : 'text-orange-700'}`}>
+                        {formatRs(c.amount)}
+                      </p>
+                      {!c.isPaid && (
+                        <button
+                          onClick={() => markCreditPaid(c.id)}
+                          disabled={markingPaid === c.id}
+                          className="flex items-center gap-1 text-xs text-green-600 hover:text-green-800 font-medium"
+                        >
+                          <CheckCircle size={13} />
+                          {markingPaid === c.id ? 'Saving...' : 'Mark Paid'}
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
               </div>
             )}
           </div>

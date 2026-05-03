@@ -32,6 +32,17 @@ export const authApi = {
   getAllUsers: () => api.get('/api/auth/all-users'),
 }
 
+// ── DAILY CASH (correct data source) ─────────────────────────────────────
+const SHOP_IDS = { CAFE: 1, BOOKSHOP: 2, FOODHUT: 3 }
+export const dailyCashApi = {
+  getSummary: (shopCode, date) => {
+    const shopId = SHOP_IDS[shopCode?.toUpperCase()]
+    if (!shopId) return Promise.reject(new Error(`Unknown shop: ${shopCode}`))
+    return api.get(`/api/daily-cash/${shopId}/${date}`)
+  },
+  getMonthlySummary: (year, month) => api.get(`/api/daily-cash/monthly/${year}/${month}`),
+}
+
 // ── TRANSACTIONS ─────────────────────────────────────────────────────────
 export const transactionApi = {
   getByDate: (department, date) =>
@@ -50,9 +61,10 @@ export const transactionApi = {
 // ── CREDITS ───────────────────────────────────────────────────────────────
 export const creditApi = {
   getAll: () => api.get('/api/credits'),
-  getUnpaidTotal: () => api.get('/api/credits/unpaid-total'),
+  getUnpaidTotal: () => api.get('/api/credits/outstanding-total'),
+  getByShop: (shopCode, date) => api.get('/api/credits/by-shop', { params: { shopCode, date } }),
   create: (data) => api.post('/api/credits', data),
-  markPaid: (id) => api.put(`/api/credits/${id}/pay`),
+  markPaid: (id) => api.patch(`/api/credits/${id}`, { isPaid: true }),
   delete: (id) => api.delete(`/api/credits/${id}`),
 }
 
@@ -66,13 +78,14 @@ export const attendanceApi = {
 export const salaryApi = {
   getAll: () => api.get('/api/salary/all'),
   getMy: () => api.get('/api/salary/my'),
+  getAdminMonthly: (year, month) => api.get('/api/salary/admin/monthly', { params: { year, month } }),
 }
 
 // ── FOOD HUT ───────────────────────────────────────────────────────────────
 export const foodhutApi = {
   getItems: () => api.get('/api/items'),
   getSalesForDay: (date) => api.get('/api/sales/day', { params: { date } }),
-  getSummary: (date) => api.get('/api/sales/summary', { params: { date } }),
+  getSummary: (date) => api.get('/api/sales/day/summary', { params: { date } }),
   recordSale: (data) => api.post('/api/sales', data),
 }
 
@@ -85,6 +98,10 @@ export const reportApi = {
 // ── AUDIT LOGS ─────────────────────────────────────────────────────────────
 export const auditApi = {
   getAll: () => api.get('/api/audit-logs'),
+  getByDate: (date) => api.get('/api/audit-logs/by-date', { params: { date } }),
+  getByUser: (userId) => api.get(`/api/audit-logs/user/${userId}`),
+  getByEntity: (entityType, entityId) => api.get(`/api/audit-logs/entity/${entityType}/${entityId}`),
+  filter: (entityType, action) => api.get('/api/audit-logs/filter', { params: { entityType, action } }),
 }
 
 // ── EXPENSE TYPES ──────────────────────────────────────────────────────────

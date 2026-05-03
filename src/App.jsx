@@ -11,6 +11,7 @@ import FoodHutPage from './pages/FoodHutPage.jsx'
 import ReportsPage from './pages/ReportsPage.jsx'
 import AuditLogsPage from './pages/AuditLogsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
+import MonthlyPage from './pages/MonthlyPage.jsx'
 
 function PrivateRoute({ children }) {
   const { isLoggedIn } = useAuth()
@@ -35,6 +36,7 @@ export default function App() {
             <Route path="credits" element={<CreditsPage />} />
             <Route path="foodhut" element={<FoodHutPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="monthly" element={<MonthlyPage />} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>

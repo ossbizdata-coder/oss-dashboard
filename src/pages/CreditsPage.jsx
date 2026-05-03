@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { creditApi } from '../services/api.js'
-import { PageHeader, LoadingSpinner, EmptyState, formatRs, Badge } from '../components/ui.jsx'
+import { PageHeader, LoadingSpinner, formatRs, Badge } from '../components/ui.jsx'
 import { CreditCard, CheckCircle, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 
@@ -9,13 +9,15 @@ export default function CreditsPage() {
   const [unpaidTotal, setUnpaidTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
+  const [shopFilter, setShopFilter] = useState('all')
+  const [userFilter, setUserFilter] = useState('all')
   const [paying, setPaying] = useState(null)
 
   const load = async () => {
     setLoading(true)
     const [c, u] = await Promise.allSettled([creditApi.getAll(), creditApi.getUnpaidTotal()])
     if (c.status === 'fulfilled') setCredits(c.value.data || [])
-    if (u.status === 'fulfilled') setUnpaidTotal(u.value.data?.total || 0)
+    if (u.status === 'fulfilled') setUnpaidTotal(u.value.data?.totalAmount || 0)
     setLoading(false)
   }
 
@@ -28,9 +30,15 @@ export default function CreditsPage() {
     setPaying(null)
   }
 
-  const filtered = filter === 'all' ? credits
-    : filter === 'unpaid' ? credits.filter(c => !c.isPaid)
-    : credits.filter(c => c.isPaid)
+  const filtered = credits
+    .filter(c => filter === 'all' ? true : filter === 'unpaid' ? !c.isPaid : c.isPaid)
+    .filter(c => shopFilter === 'all' ? true : (c.department || 'COMMON') === shopFilter)
+    .filter(c => userFilter === 'all' ? true : c.userName === userFilter)
+
+  const uniqueUsers = [...new Set(credits.map(c => c.userName).filter(Boolean))].sort()
+
+  const filteredTotal = filtered.reduce((sum, c) => sum + (c.amount || 0), 0)
+  const isFiltered = filter !== 'all' || shopFilter !== 'all' || userFilter !== 'all'
 
   const shopColor = (dept) => {
     if (dept === 'CAFE') return 'green'
@@ -71,25 +79,71 @@ export default function CreditsPage() {
       </div>
 
       {/* Filter */}
-      <div className="flex gap-2 mb-4">
-        {['all', 'unpaid', 'paid'].map(f => (
-          <button
-            key={f}
-            onClick={() => setFilter(f)}
-            className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${
-              filter === f ? 'bg-primary-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
+      <div className="space-y-2 mb-4">
+        {/* Status filter */}
+        <div className="flex gap-2">
+          {['all', 'unpaid', 'paid'].map(f => (
+            <button
+              key={f}
+              onClick={() => setFilter(f)}
+              className={`px-4 py-2 rounded-xl text-sm font-medium capitalize transition-colors ${
+                filter === f ? 'bg-primary-700 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {f}
+            </button>
+          ))}
+        </div>
+        {/* Shop filter + Customer dropdown on same row */}
+        <div className="flex gap-2 flex-wrap items-center">
+          {[['all','All Shops'],['CAFE','Cafe'],['BOOKSHOP','Bookshop'],['FOODHUT','Food Hut'],['COMMON','Common']].map(([val, label]) => (
+            <button
+              key={val}
+              onClick={() => setShopFilter(val)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-medium transition-colors ${
+                shopFilter === val ? 'bg-amber-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+          <div className="w-px h-5 bg-gray-200 mx-1" />
+          <select
+            value={userFilter}
+            onChange={e => setUserFilter(e.target.value)}
+            className="border border-gray-200 rounded-xl px-3 py-1.5 text-xs text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
           >
-            {f}
-          </button>
-        ))}
+            <option value="all">All Customers</option>
+            {uniqueUsers.map(u => (
+              <option key={u} value={u}>{u}</option>
+            ))}
+          </select>
+          {isFiltered && (
+            <span className="ml-1 px-3 py-1.5 rounded-xl text-xs font-semibold bg-red-600 text-white">
+              {formatRs(filteredTotal)}
+            </span>
+          )}
+        </div>
       </div>
 
       {loading ? <LoadingSpinner /> : (
         <div className="card">
-          {filtered.length === 0
-            ? <EmptyState icon={CreditCard} title="No credits found" />
-            : (
+          {filtered.length === 0 ? (
+            <div className="py-12 text-center">
+              <CreditCard size={40} className="mx-auto text-gray-300 mb-3" />
+              <p className="text-gray-500 font-medium">
+                {credits.length === 0
+                  ? 'No credits found in the system'
+                  : `No ${filter === 'unpaid' ? 'unpaid' : filter === 'paid' ? 'paid' : ''} credits`}
+              </p>
+              {credits.length > 0 && filter !== 'all' && (
+                <button onClick={() => setFilter('all')}
+                  className="mt-3 text-sm text-primary-600 hover:underline">
+                  Show all {credits.length} credits
+                </button>
+              )}
+            </div>
+          ) : (
               <div className="space-y-3">
                 {filtered.map((c) => (
                   <div key={c.id} className={`flex items-start gap-4 p-4 rounded-xl border ${
@@ -106,7 +160,8 @@ export default function CreditsPage() {
                       </div>
                       <p className="text-sm text-gray-500 mt-1">{c.reason || 'No reason provided'}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {c.createdAt ? format(new Date(c.createdAt), 'MMM d, yyyy HH:mm') : ''}
+                        {c.transactionDate ? `Date: ${c.transactionDate}` : ''}
+                        {c.createdAt ? ` · Added ${format(new Date(c.createdAt), 'MMM d, yyyy')}` : ''}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
@@ -134,4 +189,3 @@ export default function CreditsPage() {
     </div>
   )
 }
-
