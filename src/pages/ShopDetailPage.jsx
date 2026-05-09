@@ -1,10 +1,11 @@
 import { useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
-import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw, CreditCard, CheckCircle } from 'lucide-react'
+import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw, CreditCard, CheckCircle, Pencil, X, Check } from 'lucide-react'
 import { transactionApi, dailyCashApi, creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, EmptyState, Badge } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
 import { formatSLShort } from '../utils/timezone.js'
+import { useAuth } from '../contexts/AuthContext.jsx'
 
 const SHOP_META = {
   CAFE: { label: 'Cafe', color: '#068A4B', bg: 'bg-[#068A4B]' },
@@ -14,13 +15,19 @@ const SHOP_META = {
 
 export default function ShopDetailPage() {
   const { shopCode } = useParams()
+  const { isSuperAdmin } = useAuth()
   const meta = SHOP_META[shopCode?.toUpperCase()] || { label: shopCode, color: '#666', bg: 'bg-gray-500' }
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [summary, setSummary] = useState(null)
+  const [dailyCashId, setDailyCashId] = useState(null)
   const [transactions, setTransactions] = useState([])
   const [shopCredits, setShopCredits] = useState([])
   const [loading, setLoading] = useState(true)
   const [markingPaid, setMarkingPaid] = useState(null)
+  // Override edit state
+  const [editingField, setEditingField] = useState(null) // 'opening' | 'closing'
+  const [editValue, setEditValue] = useState('')
+  const [saving, setSaving] = useState(false)
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
@@ -31,9 +38,11 @@ export default function ShopDetailPage() {
       const [s, t, c] = await Promise.allSettled([
         dailyCashApi.getSummary(shopCode, dateStr).then(r => {
           const d = r.data
+          setDailyCashId(d.dailyCashId || null)
           return {
             openingBalance: d.openingCash,
             closingBalance: d.closingCash,
+            locked: d.locked,
             totalExpenses: d.totalExpenses,
             totalCredits: d.totalCredits,
             calculatedSales: d.totalSales,
@@ -60,6 +69,28 @@ export default function ShopDetailPage() {
       await load()
     } finally {
       setMarkingPaid(null)
+    }
+  }
+
+  const startEdit = (field, currentValue) => {
+    setEditingField(field)
+    setEditValue(currentValue ?? '')
+  }
+  const cancelEdit = () => { setEditingField(null); setEditValue('') }
+  const saveOverride = async () => {
+    if (!dailyCashId || editValue === '') return
+    setSaving(true)
+    try {
+      const payload = editingField === 'opening'
+        ? { openingCash: parseFloat(editValue) }
+        : { closingCash: parseFloat(editValue) }
+      await dailyCashApi.override(dailyCashId, payload)
+      cancelEdit()
+      await load()
+    } catch (e) {
+      alert('Failed to save: ' + (e?.response?.data || e.message))
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -94,16 +125,53 @@ export default function ShopDetailPage() {
           {summary && (
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
               {[
-                { lbl: 'Opening', val: summary.openingBalance, c: 'text-gray-700' },
-                { lbl: 'Closing', val: summary.closingBalance, c: 'text-gray-700' },
-                { lbl: 'Calculated Sales', val: summary.calculatedSales, c: 'text-green-700 font-bold' },
-                { lbl: 'Total Expenses', val: summary.totalExpenses, c: 'text-red-600' },
-                { lbl: 'Credits', val: summary.totalCredits, c: 'text-orange-600' },
-                { lbl: 'Profit', val: summary.profit, c: 'text-blue-700 font-bold' },
-              ].map(({ lbl, val, c }) => (
-                <div key={lbl} className="card py-4">
-                  <p className="text-xs text-gray-500">{lbl}</p>
-                  <p className={`text-lg font-semibold mt-1 ${c}`}>{formatRs(val)}</p>
+                { lbl: 'Opening', val: summary.openingBalance, c: 'text-gray-700', field: 'opening' },
+                { lbl: 'Closing', val: summary.closingBalance, c: 'text-gray-700', field: 'closing' },
+                { lbl: 'Calculated Sales', val: summary.calculatedSales, c: 'text-green-700 font-bold', field: null },
+                { lbl: 'Total Expenses', val: summary.totalExpenses, c: 'text-red-600', field: null },
+                { lbl: 'Credits', val: summary.totalCredits, c: 'text-orange-600', field: null },
+                { lbl: 'Profit', val: summary.profit, c: 'text-blue-700 font-bold', field: null },
+              ].map(({ lbl, val, c, field }) => (
+                <div key={lbl} className="card py-4 relative group">
+                  <p className="text-xs text-gray-500">{lbl}
+                    {summary.locked && field && (
+                      <span className="ml-1 text-[10px] text-orange-500 font-medium">LOCKED</span>
+                    )}
+                  </p>
+                  {/* Editable Opening/Closing for SuperAdmin */}
+                  {isSuperAdmin && field && editingField === field ? (
+                    <div className="mt-1 flex items-center gap-1">
+                      <input
+                        type="number"
+                        autoFocus
+                        value={editValue}
+                        onChange={e => setEditValue(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') saveOverride(); if (e.key === 'Escape') cancelEdit() }}
+                        className="w-full border border-blue-300 rounded-lg px-2 py-1 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-blue-400"
+                      />
+                      <button onClick={saveOverride} disabled={saving}
+                        className="p-1 text-white bg-green-500 hover:bg-green-600 rounded-lg disabled:opacity-50">
+                        <Check size={13} />
+                      </button>
+                      <button onClick={cancelEdit}
+                        className="p-1 text-gray-500 hover:bg-gray-100 rounded-lg">
+                        <X size={13} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 mt-1">
+                      <p className={`text-lg font-semibold ${c} flex-1`}>{formatRs(val)}</p>
+                      {isSuperAdmin && field && (
+                        <button
+                          onClick={() => startEdit(field, val)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded"
+                          title={`Edit ${lbl} balance`}
+                        >
+                          <Pencil size={12} />
+                        </button>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -202,7 +270,7 @@ export default function ShopDetailPage() {
                       <p className={`text-base font-bold ${c.isPaid ? 'text-gray-400 line-through' : 'text-orange-700'}`}>
                         {formatRs(c.amount)}
                       </p>
-                      {!c.isPaid && (
+                      {!c.isPaid && isSuperAdmin && (
                         <button
                           onClick={() => markCreditPaid(c.id)}
                           disabled={markingPaid === c.id}

@@ -1,9 +1,9 @@
 import { Link } from 'react-router-dom'
-import { Coffee, BookOpen, UtensilsCrossed, ArrowRight } from 'lucide-react'
+import { Coffee, BookOpen, UtensilsCrossed, ArrowRight, ChevronLeft, ChevronRight } from 'lucide-react'
 import { PageHeader, formatRs } from '../components/ui.jsx'
 import { useEffect, useState } from 'react'
-import { transactionApi } from '../services/api.js'
-import { format } from 'date-fns'
+import { dailyCashApi } from '../services/api.js'
+import { format, subDays, addDays } from 'date-fns'
 
 const SHOPS = [
   { code: 'CAFE', label: 'Cafe', icon: Coffee, color: '#068A4B', bg: 'bg-[#068A4B]', lightBg: 'bg-green-50' },
@@ -14,22 +14,73 @@ const SHOPS = [
 export default function ShopsPage() {
   const [summaries, setSummaries] = useState({})
   const [loading, setLoading] = useState(true)
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const [selectedDate, setSelectedDate] = useState(new Date())
+
+  const dateStr = format(selectedDate, 'yyyy-MM-dd')
+  const isToday = dateStr === format(new Date(), 'yyyy-MM-dd')
 
   useEffect(() => {
+    setLoading(true)
+    setSummaries({})
     Promise.allSettled(
-      SHOPS.map(s => transactionApi.getDepartmentSummary(s.code, today).then(r => ({ code: s.code, data: r.data })))
+      SHOPS.map(s =>
+        dailyCashApi.getSummary(s.code, dateStr).then(r => {
+          const d = r.data
+          return {
+            code: s.code,
+            data: {
+              openingBalance:  d.openingCash,
+              closingBalance:  d.closingCash,
+              calculatedSales: d.totalSales,
+              totalExpenses:   d.totalExpenses,
+              totalCredits:    d.totalCredits,
+              profit: d.totalSales != null
+                ? d.totalSales * ({ CAFE: 0.12, BOOKSHOP: 0.15, FOODHUT: 0.20 }[s.code] || 0.10)
+                : 0,
+              locked: d.locked,
+            }
+          }
+        })
+      )
     ).then(results => {
       const map = {}
       results.forEach(r => { if (r.status === 'fulfilled') map[r.value.code] = r.value.data })
       setSummaries(map)
       setLoading(false)
     })
-  }, [])
+  }, [dateStr])
 
   return (
     <div>
       <PageHeader title="Shop Operations" subtitle="Daily performance across all 3 shops" />
+
+      {/* Date Navigator */}
+      <div className="flex items-center gap-3 mb-6">
+        <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
+          <button onClick={() => setSelectedDate(d => subDays(d, 1))}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+            <ChevronLeft size={16} />
+          </button>
+          <input
+            type="date"
+            value={dateStr}
+            max={format(new Date(), 'yyyy-MM-dd')}
+            onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
+            className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
+          />
+          <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
+            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+        {!isToday && (
+          <button onClick={() => setSelectedDate(new Date())}
+            className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
+            Today
+          </button>
+        )}
+        <span className="text-xs text-gray-400">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
+      </div>
 
       <div className="grid grid-cols-1 gap-6">
         {SHOPS.map(({ code, label, icon: Icon, bg, lightBg, color }) => {

@@ -41,6 +41,7 @@ export const dailyCashApi = {
     return api.get(`/api/daily-cash/${shopId}/${date}`)
   },
   getMonthlySummary: (year, month) => api.get(`/api/daily-cash/monthly/${year}/${month}`),
+  override: (dailyCashId, data) => api.patch(`/api/daily-cash/${dailyCashId}/override`, data),
 }
 
 // ── TRANSACTIONS ─────────────────────────────────────────────────────────
@@ -87,6 +88,8 @@ export const foodhutApi = {
   getSalesForDay: (date) => api.get('/api/sales/day', { params: { date } }),
   getSummary: (date) => api.get('/api/sales/day/summary', { params: { date } }),
   recordSale: (data) => api.post('/api/sales', data),
+  updateSale: (id, data) => api.put(`/api/sales/${id}`, data),
+  deleteSale: (id) => api.delete(`/api/sales/${id}`),
 }
 
 // ── REPORTS ────────────────────────────────────────────────────────────────
@@ -104,11 +107,17 @@ export const auditApi = {
   filter: (entityType, action) => api.get('/api/audit-logs/filter', { params: { entityType, action } }),
 }
 
-// ── EXPENSE TYPES ──────────────────────────────────────────────────────────
+// ── EXPENSE TYPES ──────────────────────────────────────────────────────────────
 export const expenseTypeApi = {
   getAll: () => api.get('/api/expense-types'),
   create: (data) => api.post('/api/expense-types', data),
   delete: (id) => api.delete(`/api/expense-types/${id}`),
+}
+
+// ── ADMIN CASH TRANSACTIONS (SuperAdmin edit/delete) ───────────────────────────
+export const adminTransactionApi = {
+  update: (id, data) => api.put(`/api/admin/transactions/${id}`, data),
+  delete: (id) => api.delete(`/api/admin/transactions/${id}`),
 }
 
 // ── USERS ──────────────────────────────────────────────────────────────────

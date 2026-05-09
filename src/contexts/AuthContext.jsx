@@ -41,9 +41,11 @@ export function AuthProvider({ children }) {
 
   const isSuperAdmin = user?.role === 'SUPERADMIN'
   const isAdmin = user?.role === 'ADMIN' || isSuperAdmin
+  // Only ADMIN and SUPERADMIN can access this dashboard
+  const hasAccess = isAdmin
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn, loading, login, logout, isSuperAdmin, isAdmin }}>
+    <AuthContext.Provider value={{ user, isLoggedIn, loading, login, logout, isSuperAdmin, isAdmin, hasAccess }}>
       {!loading && children}
     </AuthContext.Provider>
   )

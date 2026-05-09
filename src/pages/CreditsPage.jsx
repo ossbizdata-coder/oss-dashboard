@@ -1,10 +1,12 @@
 import { useEffect, useState } from 'react'
 import { creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, Badge } from '../components/ui.jsx'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import { CreditCard, CheckCircle, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
 
 export default function CreditsPage() {
+  const { isSuperAdmin } = useAuth()
   const [credits, setCredits] = useState([])
   const [unpaidTotal, setUnpaidTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -168,7 +170,7 @@ export default function CreditsPage() {
                       <p className={`text-lg font-bold ${c.isPaid ? 'text-gray-400 line-through' : 'text-red-600'}`}>
                         {formatRs(c.amount)}
                       </p>
-                      {!c.isPaid && (
+                      {!c.isPaid && isSuperAdmin && (
                         <button
                           onClick={() => markPaid(c.id)}
                           disabled={paying === c.id}

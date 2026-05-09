@@ -8,6 +8,27 @@
   }
 }
 
+/* ── Global scrollbar styling ─────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #1a237e; /* primary-900 — matches sidebar */
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.55);
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.80);
+}
+/* Firefox */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255,255,255,0.55) #1a237e;
+}
+
 @layer components {
   .card {
     @apply bg-white rounded-2xl shadow-sm border border-gray-100 p-6;

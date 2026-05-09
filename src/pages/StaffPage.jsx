@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { attendanceApi, salaryApi, dailyCashApi } from '../services/api.js'
+import { attendanceApi, salaryApi, dailyCashApi, creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import {
   Users, DollarSign, TrendingUp, ChevronLeft, ChevronRight,
@@ -26,6 +26,7 @@ export default function StaffPage() {
   const [monthlySalaries, setMonthlySalaries] = useState([])
   const [monthlyShopData, setMonthlyShopData] = useState(null)
   const [todayShopData, setTodayShopData]   = useState({})
+  const [unpaidCreditsMap, setUnpaidCreditsMap] = useState({}) // userId → totalUnpaid
   const [loading, setLoading]               = useState(true)
   const [selectedMonth, setSelectedMonth]   = useState(startOfMonth(new Date()))
   const [selectedDate, setSelectedDate]     = useState(new Date())
@@ -40,15 +41,24 @@ export default function StaffPage() {
     setLoading(true)
     try {
       const today = format(new Date(), 'yyyy-MM-dd')
-      const [att, sal, shopMonthly, ...shopTodays] = await Promise.allSettled([
+      const [att, sal, shopMonthly, credits, ...shopTodays] = await Promise.allSettled([
         attendanceApi.getAll(),
         salaryApi.getAdminMonthly(year, month),
         dailyCashApi.getMonthlySummary(year, month),
+        creditApi.getAll(),
         ...SHOPS.map(c => dailyCashApi.getSummary(c, today)),
       ])
       if (att.status === 'fulfilled')         setAttendance(att.value.data || [])
       if (sal.status === 'fulfilled')         setMonthlySalaries(sal.value.data || [])
       if (shopMonthly.status === 'fulfilled') setMonthlyShopData(shopMonthly.value.data)
+      // Build unpaid credits map: userId → total unpaid
+      if (credits.status === 'fulfilled') {
+        const map = {}
+        ;(credits.value.data || []).filter(c => !c.isPaid).forEach(c => {
+          if (c.userId) map[c.userId] = (map[c.userId] || 0) + (c.amount || 0)
+        })
+        setUnpaidCreditsMap(map)
+      }
       const todayMap = {}
       shopTodays.forEach((r, i) => {
         if (r.status === 'fulfilled') todayMap[SHOPS[i]] = r.value.data
@@ -234,20 +244,27 @@ export default function StaffPage() {
                 <div className="card text-center text-gray-400 py-8">No salary data for {MONTHS[month-1]} {year}</div>
               ) : (
                 <>
-                  <div className="grid grid-cols-3 gap-4">
+                  {/* Summary tiles */}
+                  <div className="grid grid-cols-4 gap-4">
                     <div className="card text-center py-3 bg-gradient-to-br from-blue-50 to-white border-blue-100">
                       <p className="text-2xl font-bold text-blue-700">{adminSalaries.length}</p>
                       <p className="text-xs text-gray-500 mt-1">Staff</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-green-50 to-white border-green-100">
                       <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s+(r.totalSalary||0),0))}</p>
-                      <p className="text-xs text-gray-500 mt-1">Total Salary</p>
+                      <p className="text-xs text-gray-500 mt-1">Gross Salary</p>
+                    </div>
+                    <div className="card text-center py-3 bg-gradient-to-br from-red-50 to-white border-red-100">
+                      <p className="text-xl font-bold text-red-600">
+                        {formatRs(adminSalaries.reduce((s,r) => s+(unpaidCreditsMap[r.userId]||0),0))}
+                      </p>
+                      <p className="text-xs text-gray-500 mt-1">Credits Deduction</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-purple-50 to-white border-purple-100">
-                      <p className="text-2xl font-bold text-purple-700">
-                        {Math.round(adminSalaries.reduce((s,r)=>s+(r.workDays||0),0)/Math.max(adminSalaries.length,1))}
+                      <p className="text-xl font-bold text-purple-700">
+                        {formatRs(adminSalaries.reduce((s,r) => s+Math.max((r.totalSalary||0)-(unpaidCreditsMap[r.userId]||0),0),0))}
                       </p>
-                      <p className="text-xs text-gray-500 mt-1">Avg Days</p>
+                      <p className="text-xs text-gray-500 mt-1">Net Payable</p>
                     </div>
                   </div>
 
@@ -259,30 +276,46 @@ export default function StaffPage() {
                           <th className="pb-3 pr-4 font-medium text-right">Daily Rate</th>
                           <th className="pb-3 pr-4 font-medium text-right">Days</th>
                           <th className="pb-3 pr-4 font-medium text-right">Overtime</th>
-                          <th className="pb-3 font-medium text-right">Total</th>
+                          <th className="pb-3 pr-4 font-medium text-right">Gross</th>
+                          <th className="pb-3 pr-4 font-medium text-right text-red-500">Credits Owed</th>
+                          <th className="pb-3 font-medium text-right text-purple-600">Net Pay</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {adminSalaries.map((s, i) => (
-                          <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                            <td className="py-3 pr-4 font-medium text-gray-800">
-                              <div className="flex items-center gap-2">
-                                <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
-                                  {(s.name||'?').charAt(0)}
+                        {adminSalaries.map((s, i) => {
+                          const owed   = unpaidCreditsMap[s.userId] || 0
+                          const net    = Math.max((s.totalSalary || 0) - owed, 0)
+                          return (
+                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
+                              <td className="py-3 pr-4 font-medium text-gray-800">
+                                <div className="flex items-center gap-2">
+                                  <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
+                                    {(s.name||'?').charAt(0)}
+                                  </div>
+                                  {s.name}
                                 </div>
-                                {s.name}
-                              </div>
-                            </td>
-                            <td className="py-3 pr-4 text-right text-gray-600">{formatRs(s.dailyRate)}</td>
-                            <td className="py-3 pr-4 text-right text-gray-600">{s.workDays ?? '—'}</td>
-                            <td className="py-3 pr-4 text-right text-gray-500 text-xs">
-                              {(s.totalOvertimeHours||0) > 0 ? `+${s.totalOvertimeHours}h` : '—'}
-                            </td>
-                            <td className="py-3 text-right font-bold text-green-700">{formatRs(s.totalSalary)}</td>
-                          </tr>
-                        ))}
+                              </td>
+                              <td className="py-3 pr-4 text-right text-gray-600">{formatRs(s.dailyRate)}</td>
+                              <td className="py-3 pr-4 text-right text-gray-600">{s.workDays ?? '—'}</td>
+                              <td className="py-3 pr-4 text-right text-gray-500 text-xs">
+                                {(s.totalOvertimeHours||0) > 0 ? `+${s.totalOvertimeHours}h` : '—'}
+                              </td>
+                              <td className="py-3 pr-4 text-right font-semibold text-green-700">{formatRs(s.totalSalary)}</td>
+                              <td className="py-3 pr-4 text-right">
+                                {owed > 0
+                                  ? <span className="font-semibold text-red-600">- {formatRs(owed)}</span>
+                                  : <span className="text-gray-300">—</span>
+                                }
+                              </td>
+                              <td className="py-3 text-right font-bold text-purple-700">{formatRs(net)}</td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
+                    <p className="text-xs text-gray-400 mt-3 pt-3 border-t">
+                      * Credits Owed = current unpaid credits balance for each staff member. Deducted automatically from gross salary to show net payable.
+                    </p>
                   </div>
                 </>
               )}

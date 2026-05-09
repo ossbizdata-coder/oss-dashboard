@@ -16,7 +16,14 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
     try {
-      await login(email, password)
+      const data = await login(email, password)
+      // Only ADMIN and SUPERADMIN can access this dashboard
+      if (!['ADMIN', 'SUPERADMIN'].includes(data.role)) {
+        // Clear the session that was just set
+        localStorage.clear()
+        setError('Access denied. This dashboard is restricted to Admins only.')
+        return
+      }
       navigate('/')
     } catch (err) {
       setError(err.response?.data || 'Invalid email or password')
@@ -33,8 +40,8 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-900 rounded-2xl mb-4">
             <Store size={32} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">OSS Dashboard</h1>
-          <p className="text-gray-500 text-sm mt-1">OneStopSolutions — Owner Portal</p>
+          <h1 className="text-2xl font-bold text-gray-900">OneStopSolutions</h1>
+          <p className="text-gray-500 text-sm mt-1">Business Dashboard</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-5">
