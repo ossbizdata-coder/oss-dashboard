@@ -1,7 +1,7 @@
 import { useParams, Link } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw, CreditCard, CheckCircle, Pencil, X, Check } from 'lucide-react'
-import { transactionApi, dailyCashApi, creditApi } from '../services/api.js'
+import api, { transactionApi, dailyCashApi, creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, EmptyState, Badge } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
 import { formatSLShort } from '../utils/timezone.js'
@@ -21,6 +21,7 @@ export default function ShopDetailPage() {
   const [summary, setSummary] = useState(null)
   const [dailyCashId, setDailyCashId] = useState(null)
   const [transactions, setTransactions] = useState([])
+  const [transactionsError, setTransactionsError] = useState(null)
   const [shopCredits, setShopCredits] = useState([])
   const [loading, setLoading] = useState(true)
   const [markingPaid, setMarkingPaid] = useState(null)
@@ -28,6 +29,7 @@ export default function ShopDetailPage() {
   const [editingField, setEditingField] = useState(null) // 'opening' | 'closing'
   const [editValue, setEditValue] = useState('')
   const [saving, setSaving] = useState(false)
+  // we merge expenses into transactions so Transactions shows both sales and expenses
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
@@ -35,6 +37,10 @@ export default function ShopDetailPage() {
     setLoading(true)
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
     try {
+      // map shop code to numeric department id if backend expects it
+      const SHOP_IDS = { CAFE: 1, BOOKSHOP: 2, FOODHUT: 3 }
+      const deptParam = SHOP_IDS[shopCode?.toUpperCase()] ?? shopCode
+
       const [s, t, c] = await Promise.allSettled([
         dailyCashApi.getSummary(shopCode, dateStr).then(r => {
           const d = r.data
@@ -46,15 +52,66 @@ export default function ShopDetailPage() {
             totalExpenses: d.totalExpenses,
             totalCredits: d.totalCredits,
             calculatedSales: d.totalSales,
+            // include explicit expenses array from dailyCash summary so UI can reuse Expenses module data
+            expenses: d.expenses || [],
             profit: d.totalSales != null ? d.totalSales * ({ CAFE: 0.12, BOOKSHOP: 0.15, FOODHUT: 0.20 }[shopCode?.toUpperCase()] || 0.10) : 0,
           }
         }),
-        transactionApi.getByDate(shopCode, dateStr),
+        // pass department id (or fallback to shopCode) — some backends expect numeric id
+        transactionApi.getByDate(deptParam, dateStr),
         creditApi.getByShop(shopCode, dateStr),
       ])
-      if (s.status === 'fulfilled') setSummary(s.value)
-      if (t.status === 'fulfilled') setTransactions(t.value.data || [])
-      if (c.status === 'fulfilled') setShopCredits(c.value.data?.credits || [])
+      // Debug logging to help inspect API responses in devtools
+      if (s.status === 'fulfilled') {
+        console.debug('dailyCash summary response:', s.value)
+        setSummary(s.value)
+      } else {
+        console.error('dailyCash summary failed:', s.reason)
+      }
+
+      setTransactionsError(null)
+      if (t.status === 'fulfilled') {
+        console.debug('transactions response (by-date):', t.value.data)
+        let tx = t.value.data || []
+        // If backend returned no rows for by-date, try the alternate by-shop endpoint (some servers expose this)
+        if ((!tx || tx.length === 0) && shopCode) {
+          try {
+            const alt = await api.get('/api/transactions/by-shop', { params: { shopCode, date: dateStr } })
+            console.debug('transactions response (by-shop):', alt.data)
+            tx = alt.data || []
+          } catch (err) {
+            console.error('transactions by-shop failed:', err)
+          }
+        }
+        setTransactions(tx)
+      } else {
+        console.error('transactions fetch failed:', t.reason)
+        // surface 403 or other error message to the UI
+        const err = t.reason
+        const msg = err?.response?.data?.message || err?.response?.statusText || (err && err.message) || 'Failed to load transactions'
+        setTransactionsError(msg)
+        // attempt fallback to by-shop when initial call failed
+        if (shopCode) {
+          try {
+            const alt = await api.get('/api/transactions/by-shop', { params: { shopCode, date: dateStr } })
+            console.debug('transactions response (by-shop fallback):', alt.data)
+            setTransactions(alt.data || [])
+            setTransactionsError(null)
+          } catch (err) {
+            console.error('transactions by-shop fallback failed:', err)
+            const msg2 = err?.response?.data?.message || err?.response?.statusText || (err && err.message) || 'Failed to load transactions'
+            setTransactions([])
+            setTransactionsError(msg2)
+          }
+        }
+      }
+
+      if (c.status === 'fulfilled') {
+        console.debug('credits response:', c.value.data)
+        setShopCredits(c.value.data?.credits || [])
+      } else {
+        console.error('credits fetch failed:', c.reason)
+      }
     } finally {
       setLoading(false)
     }
@@ -177,63 +234,92 @@ export default function ShopDetailPage() {
             </div>
           )}
 
-          {/* Transactions Table */}
+          {/* Transactions Table (includes sales + expenses merged) */}
           <div className="card mb-6">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="font-semibold text-gray-800">Transactions ({transactions.length})</h2>
+              <h2 className="font-semibold text-gray-800">Transactions</h2>
               <button onClick={load} className="text-gray-400 hover:text-gray-600">
                 <RefreshCw size={15} />
               </button>
             </div>
-            {transactions.length === 0 ? (
-              <EmptyState title="No transactions" description="No entries recorded for this date" />
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-gray-500 border-b border-gray-100">
-                      <th className="pb-3 pr-4 font-medium">Type</th>
-                      <th className="pb-3 pr-4 font-medium">Item / Category</th>
-                      <th className="pb-3 pr-4 font-medium text-right">Amount</th>
-                      <th className="pb-3 pr-4 font-medium">Comment</th>
-                      <th className="pb-3 pr-4 font-medium">Time (SLT)</th>
-                      <th className="pb-3 font-medium">Entered By</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map((t) => (
-                      <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                        <td className="py-3 pr-4">
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            t.category === 'SALE'
-                              ? 'bg-green-100 text-green-700'
-                              : 'bg-red-100 text-red-600'
-                          }`}>
-                            {t.category}
-                          </span>
-                        </td>
-                        <td className="py-3 pr-4 font-medium text-gray-700">
-                          {t.itemName || t.item || t.expenseTypeName || '—'}
-                        </td>
-                        <td className="py-3 pr-4 text-right font-semibold">
-                          {formatRs(t.amount)}
-                        </td>
-                        <td className="py-3 pr-4 text-gray-500 max-w-[140px] truncate">
-                          {t.comment || '—'}
-                        </td>
-                        <td className="py-3 pr-4 text-gray-400 text-xs whitespace-nowrap">
-                          {formatSLShort(t.transactionTime || t.createdAt)}
-                        </td>
-                        <td className="py-3 text-gray-600 text-xs font-medium">
-                          {t.recordedByName || t.recordedBy || '—'}
-                        </td>
+
+            {/* Merge summary.expenses into transactions so this table contains both sales and expense items */}
+            {(() => {
+              const summaryExpenses = summary?.expenses || []
+              // map daily-cash expense items to transaction-like objects
+              const mappedExpenses = summaryExpenses.map(e => ({
+                id: `exp-${e.id}`,
+                category: 'EXPENSE',
+                itemName: e.expenseTypeName || e.item || 'Expense',
+                amount: e.amount || 0,
+                comment: e.description || '',
+                transactionTime: e.createdAt || null,
+                recordedByName: e.recordedByName || e.recordedBy || '—',
+              }))
+              const merged = [...(transactions || []), ...mappedExpenses]
+              if (merged.length === 0) return (
+              // If there's a server error (403 etc.) show it so user doesn't have to open DevTools
+                transactionsError ? (
+                  <div className="p-4 rounded-lg bg-red-50 border border-red-100 text-sm text-red-700">
+                    <strong>Transactions failed:</strong>
+                    <div className="mt-1">{transactionsError}</div>
+                    <div className="mt-2 text-xs text-gray-500">If this endpoint is restricted, try using an account with appropriate permissions or check the server API.</div>
+                  </div>
+                ) : (
+                  <EmptyState title="No transactions" description="No entries recorded for this date" />
+                )
+              )
+
+              return (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="text-left text-gray-500 border-b border-gray-100">
+                        <th className="pb-3 pr-4 font-medium">Type</th>
+                        <th className="pb-3 pr-4 font-medium">Item / Category</th>
+                        <th className="pb-3 pr-4 font-medium text-right">Amount</th>
+                        <th className="pb-3 pr-4 font-medium">Comment</th>
+                        <th className="pb-3 pr-4 font-medium">Time (SLT)</th>
+                        <th className="pb-3 font-medium">Entered By</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
+                    </thead>
+                    <tbody>
+                      {merged.map((t) => (
+                        <tr key={t.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                          <td className="py-3 pr-4">
+                            <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                              t.category === 'SALE'
+                                ? 'bg-green-100 text-green-700'
+                                : 'bg-red-100 text-red-600'
+                            }`}>
+                              {t.category}
+                            </span>
+                          </td>
+                          <td className="py-3 pr-4 font-medium text-gray-700">
+                            {t.itemName || t.item || t.expenseTypeName || '—'}
+                          </td>
+                          <td className="py-3 pr-4 text-right font-semibold">
+                            {formatRs(t.amount)}
+                          </td>
+                          <td className="py-3 pr-4 text-gray-500 max-w-[240px] truncate">
+                            {t.comment || '—'}
+                          </td>
+                          <td className="py-3 pr-4 text-gray-400 text-xs whitespace-nowrap">
+                            {(t.transactionTime || t.createdAt) ? formatSLShort(t.transactionTime || t.createdAt) : '—'}
+                          </td>
+                          <td className="py-3 text-gray-600 text-xs font-medium">
+                            {t.recordedByName || t.recordedBy || '—'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )
+            })()}
           </div>
+
+          {/* Expenses section removed — expenses are now merged into the Transactions table above */}
 
           {/* Credits Section */}
           <div className="card">

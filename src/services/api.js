@@ -41,6 +41,8 @@ export const dailyCashApi = {
     return api.get(`/api/daily-cash/${shopId}/${date}`)
   },
   getMonthlySummary: (year, month) => api.get(`/api/daily-cash/monthly/${year}/${month}`),
+  getMonthlyExpenses: (year, month) => api.get(`/api/expenses/monthly`, { params: { year, month } }),
+  getMonthlyCredits: (year, month) => api.get(`/api/credits/monthly`, { params: { year, month } }),
   override: (dailyCashId, data) => api.patch(`/api/daily-cash/${dailyCashId}/override`, data),
 }
 

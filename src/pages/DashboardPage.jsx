@@ -13,6 +13,7 @@ import {
 } from 'recharts'
 
 const SHOPS = ['CAFE', 'BOOKSHOP', 'FOODHUT']
+const MARGINS = { CAFE: 0.12, BOOKSHOP: 0.15, FOODHUT: 0.20 }
 const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
 export default function DashboardPage() {
@@ -28,22 +29,21 @@ export default function DashboardPage() {
     setLoading(true)
     try {
       const [summaries, att] = await Promise.allSettled([
-        Promise.all(SHOPS.map(s =>
-          dailyCashApi.getSummary(s, dateStr).then(r => {
-            const d = r.data
-            // Map DailyCashSummaryDTO fields to the shape the rest of the page expects
-            return {
-              shop: s,
-              openingBalance: d.openingCash,
-              closingBalance: d.closingCash,
-              totalExpenses: d.totalExpenses,
-              totalCredits: d.totalCredits,
-              manualSales: d.manualSales,
-              calculatedSales: d.totalSales,   // backend already computes the correct formula
-              profit: d.totalSales != null ? d.totalSales * ({ CAFE: 0.12, BOOKSHOP: 0.15, FOODHUT: 0.20 }[s] || 0.10) : 0,
-            }
-          }).catch(() => ({ shop: s }))
-        )),
+          Promise.all(SHOPS.map(s =>
+           dailyCashApi.getSummary(s, dateStr).then(r => {
+             const d = r.data
+             // Map DailyCashSummaryDTO fields to the shape the rest of the page expects
+             return {
+               shop: s,
+               openingBalance: d.openingCash,
+               closingBalance: d.closingCash,
+               totalExpenses: d.totalExpenses,
+               totalCredits: d.totalCredits,
+               manualSales: d.manualSales,
+               calculatedSales: d.totalSales,   // backend already computes the correct formula
+             }
+           }).catch(() => ({ shop: s }))
+         )),
         attendanceApi.getAll(),
       ])
       if (summaries.status === 'fulfilled') {
@@ -70,7 +70,14 @@ export default function DashboardPage() {
   }
   const totalSales    = SHOPS.reduce((sum, s) => sum + calcSales(shopSummaries[s]), 0)
   const totalExpenses = SHOPS.reduce((sum, s) => sum + (shopSummaries[s]?.totalExpenses || 0), 0)
-  const totalProfit   = SHOPS.reduce((sum, s) => sum + (shopSummaries[s]?.profit || 0), 0)
+  const calcProfit = (shopCode) => {
+    const s = shopSummaries[shopCode]
+    const sales = calcSales(s)
+    const margin = MARGINS[shopCode] || 0.10
+    return Math.round(sales * margin)
+  }
+
+  const totalProfit   = SHOPS.reduce((sum, s) => sum + calcProfit(s), 0)
   // Day's credits across all shops (from daily-cash summary)
   const totalDailyCredits = SHOPS.reduce((sum, s) => sum + (shopSummaries[s]?.totalCredits || 0), 0)
   // Staff Today: only ADMIN / SUPERADMIN roles, filtered to selected date, deduplicated by userId
@@ -92,7 +99,7 @@ export default function DashboardPage() {
     name: s === 'BOOKSHOP' ? 'Bookshop' : s.charAt(0) + s.slice(1).toLowerCase(),
     Sales:    Math.round(calcSales(shopSummaries[s])),
     Expenses: Math.round(shopSummaries[s]?.totalExpenses   || 0),
-    Profit:   Math.round(shopSummaries[s]?.profit          || 0),
+    Profit:   Math.round(calcProfit(s) || 0),
   }))
 
   return (
@@ -167,8 +174,8 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
             <StatCard title="Revenue"        value={formatRs(totalSales)}         icon={TrendingUp}  color="green"  subtitle="All shops combined" />
             <StatCard title="Expenses"       value={formatRs(totalExpenses)}      icon={TrendingDown} color="red"   subtitle="All shops combined" />
-            <StatCard title="Est. Profit"    value={formatRs(totalProfit)}        icon={DollarSign}  color="blue"   subtitle="~12-20% margin on sales" />
-            <StatCard title="Day Credits"    value={formatRs(totalDailyCredits)}  icon={CreditCard}  color="orange" subtitle="Credits given this day" />
+            <StatCard title="Profit"    value={formatRs(totalProfit)}        icon={DollarSign}  color="blue"   subtitle="~12-20% margin on sales" />
+            <StatCard title="Credits"    value={formatRs(totalDailyCredits)}  icon={CreditCard}  color="orange" subtitle="Credits given this day" />
           </div>
 
           {/* ── Shop Summaries ── */}
@@ -194,18 +201,41 @@ export default function DashboardPage() {
                     <h3 className="font-semibold text-gray-800">{label}</h3>
                     <span className="ml-auto text-xs text-gray-400 group-hover:text-primary-600 transition-colors">View →</span>
                   </div>
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div><p className="text-gray-500">Sales</p><p className="font-bold text-green-700">{formatRs(calcSales(s))}</p></div>
-                    <div><p className="text-gray-500">Expenses</p><p className="font-bold text-red-600">{formatRs(s.totalExpenses)}</p></div>
-                    <div><p className="text-gray-500">Opening</p><p className="font-semibold">{formatRs(s.openingBalance)}</p></div>
-                    <div><p className="text-gray-500">Closing</p><p className="font-semibold">{formatRs(s.closingBalance)}</p></div>
-                    {s.openingBalance != null && (
-                      <div className="col-span-2 border-t pt-2 mt-1">
-                        <p className="text-gray-500">Credits <span className="text-xs">(this day)</span></p>
-                        <p className="font-bold text-amber-600">{formatRs(s.totalCredits || 0)}</p>
-                      </div>
-                    )}
-                  </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                     {/* First row: Sales | Expenses */}
+                     <div>
+                       <p className="text-gray-500">Sales</p>
+                       <p className="font-bold text-green-700">{formatRs(calcSales(s))}</p>
+                     </div>
+                     <div>
+                       <p className="text-gray-500">Expenses</p>
+                       <p className="font-bold text-red-600">{formatRs(s.totalExpenses)}</p>
+                     </div>
+
+                     {/* Second row: Opening | Closing */}
+                     <div>
+                       <p className="text-gray-500">Opening</p>
+                       <p className="font-semibold">{formatRs(s.openingBalance)}</p>
+                     </div>
+                     <div>
+                       <p className="text-gray-500">Closing</p>
+                       <p className="font-semibold">{formatRs(s.closingBalance)}</p>
+                     </div>
+
+                     {/* Third row (full width): horizontal rule, then Profit | Credits */}
+                     {s.openingBalance != null && (
+                       <div className="col-span-2 border-t pt-2 mt-1 grid grid-cols-2 gap-3">
+                         <div>
+                           <p className="text-gray-500">Profit</p>
+                           <p className="font-extrabold text-blue-700">{formatRs(calcProfit(code))}</p>
+                         </div>
+                         <div>
+                           <p className="text-gray-500">Credits <span className="text-xs">(this day)</span></p>
+                           <p className="font-bold text-amber-600">{formatRs(s.totalCredits || 0)}</p>
+                         </div>
+                       </div>
+                     )}
+                   </div>
                 </Link>
               )
             })}
