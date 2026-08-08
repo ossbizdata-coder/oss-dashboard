@@ -21,35 +21,55 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true)
   const [shopSummaries, setShopSummaries] = useState({})
   const [attendance, setAttendance] = useState([])
+  const [loadWarning, setLoadWarning] = useState('')
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
   const isToday = dateStr === todayStr()
 
   const load = async () => {
     setLoading(true)
+    setLoadWarning('')
     try {
+      const loadOneShop = async (shopCode) => {
+        try {
+          const r = await dailyCashApi.getSummary(shopCode, dateStr)
+          const d = r.data || {}
+          return {
+            shop: shopCode,
+            openingBalance: d.openingCash,
+            closingBalance: d.closingCash,
+            totalExpenses: d.totalExpenses,
+            totalCredits: d.totalCredits,
+            manualSales: d.manualSales,
+            calculatedSales: d.totalSales,
+          }
+        } catch (_) {
+          // Fallback path avoids silent zero cards when daily-cash summary lookup fails.
+          const r2 = await transactionApi.getDepartmentSummary(shopCode, dateStr)
+          const d2 = r2.data || {}
+          return {
+            shop: shopCode,
+            openingBalance: d2.openingBalance,
+            closingBalance: d2.closingBalance,
+            totalExpenses: d2.totalExpenses,
+            totalCredits: d2.totalCredits,
+            calculatedSales: d2.calculatedSales,
+          }
+        }
+      }
+
       const [summaries, att] = await Promise.allSettled([
-          Promise.all(SHOPS.map(s =>
-           dailyCashApi.getSummary(s, dateStr).then(r => {
-             const d = r.data
-             // Map DailyCashSummaryDTO fields to the shape the rest of the page expects
-             return {
-               shop: s,
-               openingBalance: d.openingCash,
-               closingBalance: d.closingCash,
-               totalExpenses: d.totalExpenses,
-               totalCredits: d.totalCredits,
-               manualSales: d.manualSales,
-               calculatedSales: d.totalSales,   // backend already computes the correct formula
-             }
-           }).catch(() => ({ shop: s }))
-         )),
+          Promise.all(SHOPS.map(s => loadOneShop(s).catch(() => ({ shop: s, _failed: true })))),
         attendanceApi.getAll(),
       ])
       if (summaries.status === 'fulfilled') {
         const map = {}
         summaries.value.forEach(s => { map[s.shop] = s })
         setShopSummaries(map)
+        const failed = summaries.value.filter((s) => s._failed).length
+        if (failed > 0) {
+          setLoadWarning(`Some shop totals could not be loaded for ${dateStr}.`)
+        }
       }
       if (att.status === 'fulfilled') setAttendance(att.value?.data || [])
     } finally {
@@ -112,6 +132,12 @@ export default function DashboardPage() {
           </button>
         }
       />
+
+      {loadWarning && (
+        <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          {loadWarning}
+        </div>
+      )}
 
       {/* ── Date Switcher ── */}
       <div className="flex items-center gap-3 mb-6">

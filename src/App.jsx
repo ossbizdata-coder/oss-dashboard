@@ -36,6 +36,12 @@ function PrivateRoute({ children }) {
   return children
 }
 
+function SuperAdminRoute({ children }) {
+  const { isSuperAdmin } = useAuth()
+  if (!isSuperAdmin) return <Navigate to="/" replace />
+  return children
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -55,7 +61,7 @@ export default function App() {
             <Route path="expenses" element={<ExpensesPage />} />
             <Route path="foodhut" element={<FoodHutPage />} />
             <Route path="reports" element={<ReportsPage />} />
-            <Route path="monthly" element={<MonthlyPage />} />
+            <Route path="monthly" element={<SuperAdminRoute><MonthlyPage /></SuperAdminRoute>} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
             <Route path="settings" element={<SettingsPage />} />
             <Route path="users" element={<UsersPage />} />

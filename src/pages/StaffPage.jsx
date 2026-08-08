@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { attendanceApi, salaryApi, dailyCashApi, creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   Users, DollarSign, TrendingUp, ChevronLeft, ChevronRight,
   Coffee, BookOpen, UtensilsCrossed, RefreshCw
@@ -21,6 +22,7 @@ const SHOPS  = ['CAFE','BOOKSHOP','FOODHUT']
 const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
 export default function StaffPage() {
+  const { isSuperAdmin } = useAuth()
   const [tab, setTab]                       = useState('employees')
   const [attendance, setAttendance]         = useState([])
   const [monthlySalaries, setMonthlySalaries] = useState([])
@@ -41,15 +43,19 @@ export default function StaffPage() {
     setLoading(true)
     try {
       const today = format(new Date(), 'yyyy-MM-dd')
+      const salaryPromise = isSuperAdmin
+        ? salaryApi.getAdminMonthly(year, month)
+        : Promise.resolve({ data: [] })
+
       const [att, sal, shopMonthly, credits, ...shopTodays] = await Promise.allSettled([
         attendanceApi.getAll(),
-        salaryApi.getAdminMonthly(year, month),
+        salaryPromise,
         dailyCashApi.getMonthlySummary(year, month),
         creditApi.getAll(),
         ...SHOPS.map(c => dailyCashApi.getSummary(c, today)),
       ])
       if (att.status === 'fulfilled')         setAttendance(att.value.data || [])
-      if (sal.status === 'fulfilled')         setMonthlySalaries(sal.value.data || [])
+      if (sal.status === 'fulfilled')         setMonthlySalaries((sal.value && sal.value.data) || [])
       if (shopMonthly.status === 'fulfilled') setMonthlyShopData(shopMonthly.value.data)
       // Build unpaid credits map: userId → total unpaid
       if (credits.status === 'fulfilled') {
@@ -136,7 +142,7 @@ export default function StaffPage() {
       <div className="flex gap-2 mb-5">
         {[
           { key:'employees',   label:'Employees',   icon:Users },
-          { key:'salary',      label:'Salary',      icon:DollarSign },
+          ...(isSuperAdmin ? [{ key:'salary', label:'Salary', icon:DollarSign }] : []),
           { key:'performance', label:'Performance', icon:TrendingUp },
         ].map(({ key, label, icon:Icon }) => (
           <button key={key} onClick={() => setTab(key)}
@@ -251,18 +257,18 @@ export default function StaffPage() {
                       <p className="text-xs text-gray-500 mt-1">Staff</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-green-50 to-white border-green-100">
-                      <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s+(r.totalSalary||0),0))}</p>
+                      <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s+((r.baseSalary ?? r.totalSalary) || 0),0))}</p>
                       <p className="text-xs text-gray-500 mt-1">Gross Salary</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-red-50 to-white border-red-100">
                       <p className="text-xl font-bold text-red-600">
-                        {formatRs(adminSalaries.reduce((s,r) => s+(unpaidCreditsMap[r.userId]||0),0))}
+                        {formatRs(adminSalaries.reduce((s,r) => s+((r.unpaidCredits ?? unpaidCreditsMap[r.userId])||0),0))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Credits Deduction</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-purple-50 to-white border-purple-100">
                       <p className="text-xl font-bold text-purple-700">
-                        {formatRs(adminSalaries.reduce((s,r) => s+Math.max((r.totalSalary||0)-(unpaidCreditsMap[r.userId]||0),0),0))}
+                        {formatRs(adminSalaries.reduce((s,r) => s+((r.totalSalary||0)),0))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Net Payable</p>
                     </div>
@@ -283,8 +289,9 @@ export default function StaffPage() {
                       </thead>
                       <tbody>
                         {adminSalaries.map((s, i) => {
-                          const owed   = unpaidCreditsMap[s.userId] || 0
-                          const net    = Math.max((s.totalSalary || 0) - owed, 0)
+                          const owed   = (s.unpaidCredits ?? unpaidCreditsMap[s.userId]) || 0
+                          const gross  = (s.baseSalary ?? s.totalSalary) || 0
+                          const net    = s.totalSalary || 0
                           return (
                             <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                               <td className="py-3 pr-4 font-medium text-gray-800">
@@ -300,7 +307,7 @@ export default function StaffPage() {
                               <td className="py-3 pr-4 text-right text-gray-500 text-xs">
                                 {(s.totalOvertimeHours||0) > 0 ? `+${s.totalOvertimeHours}h` : '—'}
                               </td>
-                              <td className="py-3 pr-4 text-right font-semibold text-green-700">{formatRs(s.totalSalary)}</td>
+                              <td className="py-3 pr-4 text-right font-semibold text-green-700">{formatRs(gross)}</td>
                               <td className="py-3 pr-4 text-right">
                                 {owed > 0
                                   ? <span className="font-semibold text-red-600">- {formatRs(owed)}</span>
@@ -314,7 +321,7 @@ export default function StaffPage() {
                       </tbody>
                     </table>
                     <p className="text-xs text-gray-400 mt-3 pt-3 border-t">
-                      * Credits Owed = current unpaid credits balance for each staff member. Deducted automatically from gross salary to show net payable.
+                      * Credits Owed = current unpaid credits balance for each staff member. Backend already deducts this from gross to return net payable.
                     </p>
                   </div>
                 </>

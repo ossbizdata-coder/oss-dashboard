@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { transactionApi, dailyCashApi, salaryApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, EmptyState, formatRs } from '../components/ui.jsx'
+import { useAuth } from '../contexts/AuthContext.jsx'
 import { BarChart3, Download, FileText } from 'lucide-react'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import {
@@ -12,6 +13,7 @@ const SHOP_NAMES = { CAFE: 'Cafe', BOOKSHOP: 'Bookshop', FOODHUT: 'Food Hut' }
 const COLORS = ['#22c55e', '#3f51b5', '#ef4444']
 
 export default function ReportsPage() {
+  const { isSuperAdmin } = useAuth()
   const [reportType, setReportType] = useState('monthly') // 'monthly' | 'expense' | 'topitems' | 'credit' | 'profit'
   const [selectedMonth, setSelectedMonth] = useState(new Date())
   const [shopData, setShopData] = useState([])
@@ -27,11 +29,15 @@ export default function ReportsPage() {
   const loadMonthlyReport = async () => {
     setLoading(true)
     try {
+      const salaryPromise = isSuperAdmin
+        ? salaryApi.getAdminMonthly(year, month)
+        : Promise.resolve({ data: [] })
+
       const [summary, expenses, credits, salaries] = await Promise.allSettled([
         dailyCashApi.getMonthlySummary(year, month),
         dailyCashApi.getMonthlyExpenses(year, month),
         dailyCashApi.getMonthlyCredits(year, month),
-        salaryApi.getAdminMonthly(year, month),
+        salaryPromise,
       ])
 
       // Department Monthly Summary
@@ -78,12 +84,14 @@ export default function ReportsPage() {
       }
 
       // Profit Report (all departments - salaries)
-      if (salaries.status === 'fulfilled') {
+      if (isSuperAdmin && salaries.status === 'fulfilled') {
         const totalSalaries = salaries.value.data?.reduce((s, r) => s + (r.totalSalary || 0), 0) || 0
         const totalShopSales = shopData.reduce((s, d) => s + d.Sales, 0)
         const totalShopExpenses = shopData.reduce((s, d) => s + d.Expenses, 0)
         const netProfit = totalShopSales - totalShopExpenses - totalSalaries
         setProfitData({ totalSalaries, netProfit, totalShopSales, totalShopExpenses })
+      } else if (!isSuperAdmin) {
+        setProfitData(null)
       }
     } finally {
       setLoading(false)
@@ -91,6 +99,9 @@ export default function ReportsPage() {
   }
 
   useEffect(() => {
+    if (!isSuperAdmin && reportType === 'profit') {
+      setReportType('monthly')
+    }
     loadMonthlyReport()
   }, [year, month])
 
@@ -149,7 +160,7 @@ export default function ReportsPage() {
               { key: 'monthly', label: 'Monthly Summary' },
               { key: 'expense', label: 'Expenses by Type' },
               { key: 'credit', label: 'Credit Report' },
-              { key: 'profit', label: 'Profit Report' },
+              ...(isSuperAdmin ? [{ key: 'profit', label: 'Profit Report' }] : []),
             ].map(({ key, label }) => (
               <button
                 key={key}

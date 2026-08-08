@@ -1,6 +1,7 @@
 import axios from 'axios'
 
-const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// Default to same-origin in production (domain/api) to avoid localhost fallback.
+const BASE_URL = import.meta.env.VITE_API_URL || ''
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -52,6 +53,8 @@ export const transactionApi = {
     api.get('/api/transactions/by-date', { params: { department, date } }),
   getDepartmentSummary: (department, date) =>
     api.get('/api/transactions/department-summary', { params: { department, date } }),
+  getDepartmentSummaryRange: (department, startDate, endDate) =>
+    api.get('/api/transactions/department-summary', { params: { department, startDate, endDate } }),
   getDailySummary: (department) =>
     api.get('/api/transactions/daily-summary', { params: { department } }),
   getCashTotal: (department) =>
