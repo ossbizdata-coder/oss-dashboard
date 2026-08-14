@@ -2,7 +2,7 @@
 
 **Technology:** React 18 · Vite · Tailwind CSS · Axios · React Router v6  
 **URL:** `http://74.208.132.78` (HTTP) → `https://www.onestopdaily.shop` (when SSL ready)  
-**Location:** `C:\dev\oss\oss-dashboard`  
+**Location:** `C:\dev\mobile_apps\oss-dashboard`  
 **Access:** ADMIN and SUPERADMIN roles only
 
 ---
@@ -45,6 +45,7 @@ The OSS Dashboard is a **web-based admin panel** providing a comprehensive view 
 | Axios | HTTP client (with JWT interceptor) |
 | Tailwind CSS | Utility-first styling |
 | Lucide React | Icon library |
+| Recharts | Data visualization & Charts |
 
 ---
 
@@ -69,7 +70,7 @@ oss-dashboard/
 │   │   ├── CreditsPage.jsx      # Credits management
 │   │   ├── ExpensesPage.jsx     # Expenses view
 │   │   ├── FoodHutPage.jsx      # Food Hut sales
-│   │   ├── ReportsPage.jsx      # Attendance & salary reports
+│   │   ├── ReportsPage.jsx      # Comprehensive financial & item reports
 │   │   ├── MonthlyPage.jsx      # Monthly financial overview
 │   │   ├── AuditLogsPage.jsx    # Audit log viewer (ADMIN+)
 │   │   ├── SettingsPage.jsx     # App settings
@@ -183,8 +184,11 @@ userId    Numeric user ID
 - Sales summary for selected date
 
 ### `/reports` — Reports
-- Attendance report by date range / user
-- Salary report by month
+- **Monthly Summary:** Sales, Expenses, Profit by Department.
+- **Expenses by Category:** Pie and Bar charts for categorical spending.
+- **Expenses by Item:** Vertical bar chart showing top 30 itemized expenses with exact figures.
+- **Credit Report:** Paid vs Unpaid status distribution.
+- **Profit Report (Admin):** Net profit calculation after operating expenses and staff salaries.
 
 ### `/monthly` — Monthly Overview
 - Month selector
@@ -202,7 +206,8 @@ userId    Numeric user ID
 - Delete user
 
 ### `/settings` — Settings
-- Display preferences
+- Expense type management
+- User role overview
 
 ---
 
@@ -245,7 +250,7 @@ const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 ### Local Development
 
 ```bash
-cd C:\dev\oss\oss-dashboard
+cd C:\dev\mobile_apps\oss-dashboard
 npm install
 npm run dev          # Starts on http://localhost:5173
 ```
@@ -263,44 +268,25 @@ npm run build        # Outputs to /dist folder
 
 ### Deploy to Server
 
-```bash
-# From Git Bash or PowerShell (with pscp):
-scp -r dist/* root@74.208.132.78:/var/www/oss-dashboard/
+The project includes an automated deployment script that builds the dashboard, uploads it to the VPS, sets permissions, and pushes the latest code to Git.
 
-# Set permissions and reload Nginx
-ssh root@74.208.132.78 "chown -R www-data:www-data /var/www/oss-dashboard && nginx -t && systemctl reload nginx"
+```bash
+# Run from the project root
+bash server/deploy-dashboard.sh
 ```
 
-Or use the deploy script:
+**Manual Steps (if script fails):**
 ```bash
-bash server/deploy-dashboard.sh
+# Upload to server using sahan user
+scp -r dist/* sahan@74.208.132.78:/var/www/oss-dashboard/
+
+# Set permissions and reload Nginx (requires sudo password)
+ssh sahan@74.208.132.78 "sudo chown -R www-data:www-data /var/www/oss-dashboard && sudo nginx -t && sudo systemctl reload nginx"
 ```
 
 ### Nginx Configuration
 
-Nginx serves the built React SPA and proxies `/api/**` to the Spring Boot backend on port 8080:
-
-```nginx
-server {
-    listen 80;
-    server_name 74.208.132.78 www.onestopdaily.shop;
-
-    root /var/www/oss-dashboard;
-    index index.html;
-
-    # React SPA — all routes go to index.html
-    location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API proxy to Spring Boot
-    location /api/ {
-        proxy_pass http://localhost:8080;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-}
-```
+Nginx serves the built React SPA and proxies `/api/**` to the Spring Boot backend on port 8080.
 
 ---
 
@@ -321,4 +307,3 @@ VITE_API_URL=https://www.onestopdaily.shop
 ```
 
 > After changing `.env`, run `npm run build` and redeploy the `/dist` folder.
-
