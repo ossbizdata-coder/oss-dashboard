@@ -60,6 +60,7 @@ export default function ReportsPage() {
   const [topItemsData, setTopItemsData] = useState([])
   const [creditData, setCreditData] = useState([])
   const [profitData, setProfitData] = useState(null)
+  const [reportTotals, setReportTotals] = useState(null) // { totalRevenue, totalExpenses, totalProfit }
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -111,6 +112,22 @@ export default function ReportsPage() {
           }
         })
         setShopData(processedShops)
+
+        // If the backend provided overall totals, prefer those for aggregate metrics
+        const overall = summaryPayload.overall || summaryPayload.overallSummary || summaryPayload.totals || {}
+        const overallTotalRevenue = toNumber(overall.totalRevenue ?? overall.totalSales ?? overall.revenue ?? 0)
+        const overallTotalExpenses = toNumber(overall.totalExpenses ?? overall.totalExpenses ?? overall.totalExpenses ?? 0)
+        const overallProfit = toNumber(overall.totalProfit ?? overall.profit ?? 0)
+        if (overallTotalRevenue || overallTotalExpenses || overallProfit) {
+          setReportTotals({ totalRevenue: overallTotalRevenue, totalExpenses: overallTotalExpenses, totalProfit: overallProfit })
+        } else {
+          // fallback to computed sums from processedShops
+          setReportTotals({
+            totalRevenue: processedShops.reduce((s, d) => s + (d.revenue || 0), 0),
+            totalExpenses: processedShops.reduce((s, d) => s + (d.expenses || 0), 0),
+            totalProfit: processedShops.reduce((s, d) => s + (d.profit || 0), 0),
+          })
+        }
       }
 
       // 2. Process Expenses by Category & Item
@@ -151,10 +168,13 @@ export default function ReportsPage() {
       // 4. Process Profit Report (Admin only)
       if (isSuperAdmin && salaries.status === 'fulfilled') {
         const totalSalaries = salaries.value.data?.reduce((s, r) => s + (r.totalSalary || 0), 0) || 0
-        const totalRevenue = processedShops.reduce((s, d) => s + d.revenue, 0)
-        const totalExpenses = processedShops.reduce((s, d) => s + d.expenses, 0)
-        const netProfit = totalRevenue - totalExpenses - totalSalaries
-        setProfitData({ totalSalaries, netProfit, totalRevenue, totalExpenses })
+        // Prefer backend overall totals if present
+        const totals = reportTotals || {
+          totalRevenue: processedShops.reduce((s, d) => s + d.revenue, 0),
+          totalExpenses: processedShops.reduce((s, d) => s + d.expenses, 0),
+        }
+        const netProfit = (totals.totalRevenue || 0) - (totals.totalExpenses || 0) - totalSalaries
+        setProfitData({ totalSalaries, netProfit, totalRevenue: totals.totalRevenue || 0, totalExpenses: totals.totalExpenses || 0 })
       } else {
         setProfitData(null)
       }
@@ -186,9 +206,14 @@ export default function ReportsPage() {
     a.href = url; a.download = filename; a.click()
   }
 
-  const totalRevenue = shopData.reduce((s, d) => s + d.revenue, 0)
-  const totalExpenses = shopData.reduce((s, d) => s + d.expenses, 0)
-  const totalProfit = shopData.reduce((s, d) => s + d.profit, 0)
+  // Use backend-provided totals when available to avoid double-counting or mismatches
+  const totalRevenue = reportTotals?.totalRevenue ?? shopData.reduce((s, d) => s + (d.revenue || 0), 0)
+  const totalExpenses = reportTotals?.totalExpenses ?? shopData.reduce((s, d) => s + (d.expenses || 0), 0)
+  const totalProfit = reportTotals?.totalProfit ?? shopData.reduce((s, d) => s + (d.profit || 0), 0)
+
+  // For the expense report, compute expense total directly from expenseData when present
+  const expenseReportTotal = expenseData.length > 0 ? expenseData.reduce((s, e) => s + (e.value || 0), 0) : totalExpenses
+
   const hasData = shopData.length > 0 || expenseData.length > 0 || creditData.length > 0
 
   return (
@@ -367,7 +392,7 @@ export default function ReportsPage() {
                         <tr key={e.name} className="border-b border-gray-50 hover:bg-gray-50">
                           <td className="py-3 text-gray-800 font-medium">{e.name}</td>
                           <td className="py-3 text-right font-bold text-red-600">{formatRs(e.value)}</td>
-                          <td className="py-3 text-right text-gray-500">{(totalExpenses > 0 ? (e.value/totalExpenses)*100 : 0).toFixed(1)}%</td>
+                          <td className="py-3 text-right text-gray-500">{(expenseReportTotal > 0 ? (e.value/expenseReportTotal)*100 : 0).toFixed(1)}%</td>
                         </tr>
                       ))}
                     </tbody>
