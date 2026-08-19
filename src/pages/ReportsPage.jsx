@@ -11,6 +11,46 @@ import {
 const SHOP_NAMES = { CAFE: 'Cafe', BOOKSHOP: 'Bookshop', FOODHUT: 'Food Hut' }
 const COLORS = ['#22c55e', '#3f51b5', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899']
 
+const toNumber = (value) => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
+const normalizeList = (payload) => {
+  if (Array.isArray(payload)) return payload
+  if (!payload || typeof payload !== 'object') return []
+
+  const nestedCandidates = [
+    payload.data,
+    payload.rows,
+    payload.records,
+    payload.items,
+    payload.results,
+    payload.shops,
+    payload.expenses,
+    payload.data?.rows,
+    payload.data?.records,
+    payload.data?.items,
+    payload.data?.results,
+    payload.data?.shops,
+    payload.data?.expenses,
+  ]
+
+  for (const candidate of nestedCandidates) {
+    if (Array.isArray(candidate)) return candidate
+  }
+
+  return []
+}
+
+const pickValue = (obj, keys) => {
+  for (const key of keys) {
+    const value = obj?.[key]
+    if (value !== null && value !== undefined && String(value).trim() !== '') return value
+  }
+  return 'Other'
+}
+
 export default function ReportsPage() {
   const { isSuperAdmin } = useAuth()
   const [reportType, setReportType] = useState('monthly') // 'monthly' | 'expense' | 'items' | 'credit' | 'profit'
@@ -45,17 +85,22 @@ export default function ReportsPage() {
 
       // 1. Process Monthly Summary
       if (summary.status === 'fulfilled') {
-        const shops = summary.value.data?.shops || []
-        processedShops = shops.map(s => {
-          const cashSales = Math.round(s.totalSales || 0)
-          const expensesVal = Math.round(s.totalExpenses || 0)
-          const creditsVal = Math.round(s.totalCredits || 0)
-          const totalRevenue = cashSales + creditsVal
-          const profit = totalRevenue - expensesVal
+        const summaryPayload = summary.value?.data || summary.value || {}
+        const shops = normalizeList(summaryPayload.shops || summaryPayload)
+        processedShops = shops.map((s) => {
+          const cashSales = Math.round(toNumber(s.totalSales ?? s.sales ?? s.cashSales))
+          const expensesVal = Math.round(toNumber(s.totalExpenses ?? s.expenses))
+          const creditsVal = Math.round(toNumber(s.totalCredits ?? s.credits ?? s.creditSales))
+          const reportedRevenue = toNumber(s.totalRevenue ?? s.revenue)
+          const totalRevenue = reportedRevenue > 0 ? reportedRevenue : cashSales + creditsVal
+          const directProfit = toNumber(s.profit ?? s.grossProfit)
+          const profit = directProfit !== 0 || totalRevenue > 0 || expensesVal > 0
+            ? (directProfit || totalRevenue - expensesVal)
+            : 0
           const margin = totalRevenue > 0 ? (profit / totalRevenue) * 100 : 0
 
           return {
-            name: SHOP_NAMES[s.shopCode] || s.shopCode,
+            name: SHOP_NAMES[s.shopCode] || s.shopName || s.shopCode || 'Shop',
             code: s.shopCode,
             cashSales,
             expenses: expensesVal,
@@ -70,17 +115,19 @@ export default function ReportsPage() {
 
       // 2. Process Expenses by Category & Item
       if (expenses.status === 'fulfilled') {
-        const exps = expenses.value.data || []
+        const exps = normalizeList(expenses.value?.data || expenses.value)
         const aggByType = {}
         const aggByItem = {}
 
-        exps.forEach(e => {
-          const type = e.expenseTypeName || 'Other'
-          const item = e.description || e.expenseTypeName || 'Other'
+        exps.forEach((e) => {
+          const type = pickValue(e, ['expenseTypeName', 'expenseType', 'type', 'category', 'name'])
+          const item = pickValue(e, ['description', 'expenseName', 'itemName', 'detail', 'title', 'expenseTypeName', 'expenseType'])
+          const amount = toNumber(e.amount ?? e.total ?? e.value ?? e.expenseAmount)
+
           if (!aggByType[type]) aggByType[type] = 0
-          aggByType[type] += e.amount || 0
+          aggByType[type] += amount
           if (!aggByItem[item]) aggByItem[item] = 0
-          aggByItem[item] += e.amount || 0
+          aggByItem[item] += amount
         })
 
         setExpenseData(Object.entries(aggByType)
