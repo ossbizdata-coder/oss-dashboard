@@ -29,8 +29,8 @@ api.interceptors.response.use(
 
 // ── AUTH ──────────────────────────────────────────────────────────────────
 export const authApi = {
-  login: (email, password) => api.post('/api/auth/login', { email, password }),
-  getAllUsers: () => api.get('/api/auth/all-users'),
+  login: (email, password) => api.post('/auth/login', { email, password }),
+  getAllUsers: () => api.get('/auth/all-users'),
 }
 
 // ── DAILY CASH (correct data source) ─────────────────────────────────────
@@ -39,97 +39,97 @@ export const dailyCashApi = {
   getSummary: (shopCode, date) => {
     const shopId = SHOP_IDS[shopCode?.toUpperCase()]
     if (!shopId) return Promise.reject(new Error(`Unknown shop: ${shopCode}`))
-    return api.get(`/api/daily-cash/${shopId}/${date}`)
+    return api.get(`/daily-cash/${shopId}/${date}`)
   },
-  getMonthlySummary: (year, month) => api.get(`/api/daily-cash/monthly/${year}/${month}`),
-  getMonthlyExpenses: (year, month) => api.get(`/api/expenses/monthly`, { params: { year, month } }),
-  getMonthlyCredits: (year, month) => api.get(`/api/credits/monthly`, { params: { year, month } }),
-  override: (dailyCashId, data) => api.patch(`/api/daily-cash/${dailyCashId}/override`, data),
+  getMonthlySummary: (year, month) => api.get(`/daily-cash/monthly/${year}/${month}`),
+  getMonthlyExpenses: (year, month) => api.get(`/expenses/monthly`, { params: { year, month } }),
+  getMonthlyCredits: (year, month) => api.get(`/credits/monthly`, { params: { year, month } }),
+  override: (dailyCashId, data) => api.patch(`/daily-cash/${dailyCashId}/override`, data),
 }
 
 // ── TRANSACTIONS ─────────────────────────────────────────────────────────
 export const transactionApi = {
   getByDate: (department, date) =>
-    api.get('/api/transactions/by-date', { params: { department, date } }),
+    api.get('/transactions/by-date', { params: { department, date } }),
   getDepartmentSummary: (department, date) =>
-    api.get('/api/transactions/department-summary', { params: { department, date } }),
+    api.get('/transactions/department-summary', { params: { department, date } }),
   getDepartmentSummaryRange: (department, startDate, endDate) =>
-    api.get('/api/transactions/department-summary', { params: { department, startDate, endDate } }),
+    api.get('/transactions/department-summary', { params: { department, startDate, endDate } }),
   getDailySummary: (department) =>
-    api.get('/api/transactions/daily-summary', { params: { department } }),
+    api.get('/transactions/daily-summary', { params: { department } }),
   getCashTotal: (department) =>
-    api.get('/api/transactions/department-cash-total', { params: { department } }),
-  create: (data) => api.post('/api/transactions', data),
-  update: (id, data) => api.put(`/api/transactions/${id}`, data),
-  delete: (id) => api.delete(`/api/transactions/${id}`),
+    api.get('/transactions/department-cash-total', { params: { department } }),
+  create: (data) => api.post('/transactions', data),
+  update: (id, data) => api.put(`/transactions/${id}`, data),
+  delete: (id) => api.delete(`/transactions/${id}`),
 }
 
 // ── CREDITS ───────────────────────────────────────────────────────────────
 export const creditApi = {
-  getAll: () => api.get('/api/credits'),
-  getUnpaidTotal: () => api.get('/api/credits/outstanding-total'),
-  getByShop: (shopCode, date) => api.get('/api/credits/by-shop', { params: { shopCode, date } }),
-  create: (data) => api.post('/api/credits', data),
-  markPaid: (id) => api.patch(`/api/credits/${id}`, { isPaid: true }),
-  delete: (id) => api.delete(`/api/credits/${id}`),
+  getAll: () => api.get('/credits'),
+  getUnpaidTotal: () => api.get('/credits/outstanding-total'),
+  getByShop: (shopCode, date) => api.get('/credits/by-shop', { params: { shopCode, date } }),
+  create: (data) => api.post('/credits', data),
+  markPaid: (id) => api.patch(`/credits/${id}`, { isPaid: true }),
+  delete: (id) => api.delete(`/credits/${id}`),
 }
 
 // ── ATTENDANCE ─────────────────────────────────────────────────────────────
 export const attendanceApi = {
-  getAll: () => api.get('/api/attendance/all'),
-  getToday: () => api.get('/api/attendance/today'),
+  getAll: () => api.get('/attendance/all'),
+  getToday: () => api.get('/attendance/today'),
 }
 
 // ── SALARY ─────────────────────────────────────────────────────────────────
 export const salaryApi = {
-  getAll: () => api.get('/api/salary/all'),
-  getMy: () => api.get('/api/salary/my'),
-  getAdminMonthly: (year, month) => api.get('/api/salary/admin/monthly', { params: { year, month } }),
+  getAll: () => api.get('/salary/all'),
+  getMy: () => api.get('/salary/my'),
+  getAdminMonthly: (year, month) => api.get('/salary/admin/monthly', { params: { year, month } }),
 }
 
 // ── FOOD HUT ───────────────────────────────────────────────────────────────
 export const foodhutApi = {
-  getItems: () => api.get('/api/items'),
-  getSalesForDay: (date) => api.get('/api/sales/day', { params: { date } }),
-  getSummary: (date) => api.get('/api/sales/day/summary', { params: { date } }),
-  recordSale: (data) => api.post('/api/sales', data),
-  updateSale: (id, data) => api.put(`/api/sales/${id}`, data),
-  deleteSale: (id) => api.delete(`/api/sales/${id}`),
+  getItems: () => api.get('/items'),
+  getSalesForDay: (date) => api.get('/sales/day', { params: { date } }),
+  getSummary: (date) => api.get('/sales/day/summary', { params: { date } }),
+  recordSale: (data) => api.post('/sales', data),
+  updateSale: (id, data) => api.put(`/sales/${id}`, data),
+  deleteSale: (id) => api.delete(`/sales/${id}`),
 }
 
 // ── REPORTS ────────────────────────────────────────────────────────────────
 export const reportApi = {
-  getAttendance: (params) => api.get('/api/reports/attendance', { params }),
-  getSalary: (params) => api.get('/api/reports/salary', { params }),
+  getAttendance: (params) => api.get('/reports/attendance', { params }),
+  getSalary: (params) => api.get('/reports/salary', { params }),
 }
 
 // ── AUDIT LOGS ─────────────────────────────────────────────────────────────
 export const auditApi = {
-  getAll: () => api.get('/api/audit-logs'),
-  getByDate: (date) => api.get('/api/audit-logs/by-date', { params: { date } }),
-  getByUser: (userId) => api.get(`/api/audit-logs/user/${userId}`),
-  getByEntity: (entityType, entityId) => api.get(`/api/audit-logs/entity/${entityType}/${entityId}`),
-  filter: (entityType, action) => api.get('/api/audit-logs/filter', { params: { entityType, action } }),
+  getAll: () => api.get('/audit-logs'),
+  getByDate: (date) => api.get('/audit-logs/by-date', { params: { date } }),
+  getByUser: (userId) => api.get(`/audit-logs/user/${userId}`),
+  getByEntity: (entityType, entityId) => api.get(`/audit-logs/entity/${entityType}/${entityId}`),
+  filter: (entityType, action) => api.get('/audit-logs/filter', { params: { entityType, action } }),
 }
 
 // ── EXPENSE TYPES ──────────────────────────────────────────────────────────────
 export const expenseTypeApi = {
-  getAll: () => api.get('/api/expense-types'),
-  create: (data) => api.post('/api/expense-types', data),
-  delete: (id) => api.delete(`/api/expense-types/${id}`),
+  getAll: () => api.get('/expense-types'),
+  create: (data) => api.post('/expense-types', data),
+  delete: (id) => api.delete(`/expense-types/${id}`),
 }
 
 // ── ADMIN CASH TRANSACTIONS (SuperAdmin edit/delete) ───────────────────────────
 export const adminTransactionApi = {
-  update: (id, data) => api.put(`/api/admin/transactions/${id}`, data),
-  delete: (id) => api.delete(`/api/admin/transactions/${id}`),
+  update: (id, data) => api.put(`/admin/transactions/${id}`, data),
+  delete: (id) => api.delete(`/admin/transactions/${id}`),
 }
 
 // ── USERS ──────────────────────────────────────────────────────────────────
 export const userApi = {
-  getAll: () => api.get('/api/users'),
-  update: (id, data) => api.put(`/api/users/${id}`, data),
-  delete: (id) => api.delete(`/api/users/${id}`),
+  getAll: () => api.get('/users'),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
 }
 
 export default api
