@@ -1,7 +1,8 @@
 import axios from 'axios'
 
-// Default to same-origin in production (domain/api) to avoid localhost fallback.
-const BASE_URL = import.meta.env.VITE_API_URL || ''
+// Get the base URL and ensure it has /api appended automatically.
+const ENV_URL = import.meta.env.VITE_API_URL || ''
+const BASE_URL = `${ENV_URL.replace(/\/$/, '')}/api`
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -33,7 +34,7 @@ export const authApi = {
   getAllUsers: () => api.get('/auth/all-users'),
 }
 
-// ── DAILY CASH (correct data source) ─────────────────────────────────────
+// ── DAILY CASH ───────────────────────────────────────────────────────────
 const SHOP_IDS = { CAFE: 1, BOOKSHOP: 2, FOODHUT: 3 }
 export const dailyCashApi = {
   getSummary: (shopCode, date) => {
@@ -49,16 +50,11 @@ export const dailyCashApi = {
 
 // ── TRANSACTIONS ─────────────────────────────────────────────────────────
 export const transactionApi = {
-  getByDate: (department, date) =>
-    api.get('/transactions/by-date', { params: { department, date } }),
-  getDepartmentSummary: (department, date) =>
-    api.get('/transactions/department-summary', { params: { department, date } }),
-  getDepartmentSummaryRange: (department, startDate, endDate) =>
-    api.get('/transactions/department-summary', { params: { department, startDate, endDate } }),
-  getDailySummary: (department) =>
-    api.get('/transactions/daily-summary', { params: { department } }),
-  getCashTotal: (department) =>
-    api.get('/transactions/department-cash-total', { params: { department } }),
+  getByDate: (department, date) => api.get('/transactions/by-date', { params: { department, date } }),
+  getDepartmentSummary: (department, date) => api.get('/transactions/department-summary', { params: { department, date } }),
+  getDepartmentSummaryRange: (department, startDate, endDate) => api.get('/transactions/department-summary', { params: { department, startDate, endDate } }),
+  getDailySummary: (department) => api.get('/transactions/daily-summary', { params: { department } }),
+  getCashTotal: (department) => api.get('/transactions/department-cash-total', { params: { department } }),
   create: (data) => api.post('/transactions', data),
   update: (id, data) => api.put(`/transactions/${id}`, data),
   delete: (id) => api.delete(`/transactions/${id}`),
@@ -97,40 +93,4 @@ export const foodhutApi = {
   deleteSale: (id) => api.delete(`/sales/${id}`),
 }
 
-// ── REPORTS ────────────────────────────────────────────────────────────────
-export const reportApi = {
-  getAttendance: (params) => api.get('/reports/attendance', { params }),
-  getSalary: (params) => api.get('/reports/salary', { params }),
-}
-
-// ── AUDIT LOGS ─────────────────────────────────────────────────────────────
-export const auditApi = {
-  getAll: () => api.get('/audit-logs'),
-  getByDate: (date) => api.get('/audit-logs/by-date', { params: { date } }),
-  getByUser: (userId) => api.get(`/audit-logs/user/${userId}`),
-  getByEntity: (entityType, entityId) => api.get(`/audit-logs/entity/${entityType}/${entityId}`),
-  filter: (entityType, action) => api.get('/audit-logs/filter', { params: { entityType, action } }),
-}
-
-// ── EXPENSE TYPES ──────────────────────────────────────────────────────────────
-export const expenseTypeApi = {
-  getAll: () => api.get('/expense-types'),
-  create: (data) => api.post('/expense-types', data),
-  delete: (id) => api.delete(`/expense-types/${id}`),
-}
-
-// ── ADMIN CASH TRANSACTIONS (SuperAdmin edit/delete) ───────────────────────────
-export const adminTransactionApi = {
-  update: (id, data) => api.put(`/admin/transactions/${id}`, data),
-  delete: (id) => api.delete(`/admin/transactions/${id}`),
-}
-
-// ── USERS ──────────────────────────────────────────────────────────────────
-export const userApi = {
-  getAll: () => api.get('/users'),
-  update: (id, data) => api.put(`/users/${id}`, data),
-  delete: (id) => api.delete(`/users/${id}`),
-}
-
 export default api
-
