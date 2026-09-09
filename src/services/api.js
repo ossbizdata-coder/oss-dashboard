@@ -9,10 +9,12 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Inject JWT token automatically
+// Inject JWT token automatically (skip login endpoint to avoid stale-token login failures).
 api.interceptors.request.use((config) => {
   const token = localStorage.getItem('token')
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  const url = String(config.url || '')
+  const isAuthLogin = url.includes('/auth/login')
+  if (token && !isAuthLogin) config.headers.Authorization = `Bearer ${token}`
   return config
 })
 
@@ -83,7 +85,7 @@ export const salaryApi = {
   getAdminMonthly: (year, month) => api.get('/salary/admin/monthly', { params: { year, month } }),
 }
 
-// ── AUDIT LOGS ────────────────────────────────────────────────────────────────
+// ── AUDIT LOGS ─────────────────────────────────────────────────────────────
 export const auditApi = {
   getAll: () => api.get('/audit-logs'),
   getByDate: (date) => api.get('/audit-logs/by-date', { params: { date } }),
@@ -92,21 +94,21 @@ export const auditApi = {
   filter: (params) => api.get('/audit-logs/filter', { params }),
 }
 
-// ── EXPENSE TYPES ─────────────────────────────────────────────────────────────
+// ── EXPENSE TYPES ──────────────────────────────────────────────────────────
 export const expenseTypeApi = {
   getAll: (shopType) => api.get('/expenses/types', { params: shopType ? { shopType } : undefined }),
   create: (data) => api.post('/expenses/types', data),
   delete: (id) => api.delete(`/expenses/types/${id}`),
 }
 
-// ── ADMIN TRANSACTIONS ────────────────────────────────────────────────────────
+// ── ADMIN TRANSACTIONS ─────────────────────────────────────────────────────
 export const adminTransactionApi = {
   getById: (id) => api.get(`/admin/transactions/${id}`),
   update: (id, data) => api.put(`/admin/transactions/${id}`, data),
   delete: (id) => api.delete(`/admin/transactions/${id}`),
 }
 
-// ── USERS ─────────────────────────────────────────────────────────────────────
+// ── USERS ───────────────────────────────────────────────────────────────────
 export const userApi = {
   getAll: () => api.get('/users'),
   getById: (id) => api.get(`/users/${id}`),
