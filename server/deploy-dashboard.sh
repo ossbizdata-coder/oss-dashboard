@@ -39,17 +39,18 @@ echo "📦 Step 3: Preparing server..."
 ssh $SERVER "mkdir -p $TMP_DIR && rm -rf $TMP_DIR/*"
 
 # 4. Upload
-echo "📤 Step 4: Uploading build files to $SERVER..."
-scp -r dist/* $SERVER:$TMP_DIR/
+echo "📤 Step 4: Uploading build directory to $SERVER..."
+# Copy the whole dist folder instead of using a wildcard
+scp -r dist $SERVER:$TMP_DIR/
 
 # 5. Move to Web Root & Cleanup
 echo "🔧 Step 5: Moving files to web root and setting permissions..."
-# Using -tt for interactive sudo password prompt if needed
+# Since we uploaded the folder 'dist', the files are in $TMP_DIR/dist/
 ssh -tt $SERVER "
     echo '📂 Clearing remote directory...'
     sudo rm -rf $REMOTE_DIR/*
     echo '📂 Copying new files to web root...'
-    sudo cp -r $TMP_DIR/* $REMOTE_DIR/
+    sudo cp -r $TMP_DIR/dist/* $REMOTE_DIR/
     echo '🔑 Setting ownership to www-data...'
     sudo chown -R www-data:www-data $REMOTE_DIR
     echo '🧹 Cleaning up temp directory...'
