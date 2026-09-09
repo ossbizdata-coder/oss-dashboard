@@ -25,7 +25,7 @@ echo "📦 Uploading to $SERVER:$REMOTE_DIR ..."
 scp -r dist/* $SERVER:$REMOTE_DIR/
 
 echo "🔧 Setting permissions and reloading Nginx (you may be asked for sudo password)..."
-ssh "$SERVER" "sudo sh -c 'chown -R www-data:www-data $REMOTE_DIR && nginx -t && systemctl reload nginx'"
+ssh -tt "$SERVER" "sudo sh -c 'chown -R www-data:www-data $REMOTE_DIR && nginx -t && systemctl reload nginx'"
 
 echo ""
 echo "✅ Dashboard deployed to VPS successfully!"
