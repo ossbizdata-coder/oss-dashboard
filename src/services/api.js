@@ -83,6 +83,38 @@ export const salaryApi = {
   getAdminMonthly: (year, month) => api.get('/salary/admin/monthly', { params: { year, month } }),
 }
 
+// ── AUDIT LOGS ────────────────────────────────────────────────────────────────
+export const auditApi = {
+  getAll: () => api.get('/audit-logs'),
+  getByDate: (date) => api.get('/audit-logs/by-date', { params: { date } }),
+  getByUser: (userId) => api.get(`/audit-logs/user/${userId}`),
+  getByEntity: (entityType, entityId) => api.get(`/audit-logs/entity/${entityType}/${entityId}`),
+  filter: (params) => api.get('/audit-logs/filter', { params }),
+}
+
+// ── EXPENSE TYPES ─────────────────────────────────────────────────────────────
+export const expenseTypeApi = {
+  getAll: (shopType) => api.get('/expenses/types', { params: shopType ? { shopType } : undefined }),
+  create: (data) => api.post('/expenses/types', data),
+  delete: (id) => api.delete(`/expenses/types/${id}`),
+}
+
+// ── ADMIN TRANSACTIONS ────────────────────────────────────────────────────────
+export const adminTransactionApi = {
+  getById: (id) => api.get(`/admin/transactions/${id}`),
+  update: (id, data) => api.put(`/admin/transactions/${id}`, data),
+  delete: (id) => api.delete(`/admin/transactions/${id}`),
+}
+
+// ── USERS ─────────────────────────────────────────────────────────────────────
+export const userApi = {
+  getAll: () => api.get('/users'),
+  getById: (id) => api.get(`/users/${id}`),
+  create: (data) => api.post('/users', data),
+  update: (id, data) => api.put(`/users/${id}`, data),
+  delete: (id) => api.delete(`/users/${id}`),
+}
+
 // ── FOOD HUT ───────────────────────────────────────────────────────────────
 export const foodhutApi = {
   getItems: () => api.get('/items'),
