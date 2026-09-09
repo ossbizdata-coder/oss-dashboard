@@ -28,6 +28,12 @@ const overallProfit = (summary = {}) => {
   const shops = summary?.shops || []
   return shops.reduce((sum, s) => sum + shopProfit(s), 0)
 }
+const overallRevenue = (summary = {}) => {
+  const shops = summary?.shops || []
+  const tracked = shops.filter(s => SHOP_META[s.shopCode])
+  if (tracked.length) return tracked.reduce((sum, s) => sum + toNum(s.totalSales), 0)
+  return toNum(summary?.overall?.totalSales)
+}
 
 const monthRange = (year, month) => {
   const mm = String(month).padStart(2, '0')
@@ -146,7 +152,7 @@ export default function MonthlyPage() {
         if (mSummaryRes.status === 'fulfilled') {
           const summary = mSummaryRes.value || {}
           const overall = summary.overall || {}
-          ytdSales += overall.totalSales || 0
+          ytdSales += overallRevenue(summary)
           ytdExpenses += overall.totalExpenses || 0
           ytdProfit += overallProfit(summary)
         }
@@ -185,6 +191,7 @@ export default function MonthlyPage() {
     data?.shops?.find(s => s.shopCode === shopCode) || {}
 
   const overall = data?.overall || {}
+  const monthlyRevenue = overallRevenue(data)
   const monthlyGrossProfit = overallProfit(data)
   const monthlyNetProfit = monthlyGrossProfit - monthlySalary
 
@@ -267,7 +274,7 @@ export default function MonthlyPage() {
                 <TrendingUp size={16} className="text-green-600" />
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</span>
               </div>
-              <p className="text-2xl font-bold text-green-700">{formatRs(overall.totalSales)}</p>
+              <p className="text-2xl font-bold text-green-700">{formatRs(monthlyRevenue)}</p>
               <p className="text-xs text-gray-400 mt-1">All shops · {MONTHS[month-1]} {year}</p>
             </div>
             <div className="card bg-gradient-to-br from-red-50 to-white border border-red-100">
@@ -369,4 +376,3 @@ export default function MonthlyPage() {
     </div>
   )
 }
-
