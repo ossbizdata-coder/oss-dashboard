@@ -1,37 +1,66 @@
 #!/bin/bash
-set -euo pipefail
+# =============================================================================
+# deploy-dashboard.sh — Build, Sync to Git, and Deploy to VPS
+# =============================================================================
 
+# Stop on first error
+set -e
+
+# Configuration
 SERVER="sahan@74.208.132.78"
 REMOTE_DIR="/var/www/oss-dashboard"
+TMP_DIR="/home/sahan/oss-dashboard-deploy-tmp"
 
-trap 'echo "❌ Deployment failed. Check the previous step output above."; exit 1' ERR
+echo "--------------------------------------------------"
+echo "🚀 Starting OSS Dashboard Deployment"
+echo "--------------------------------------------------"
 
-echo "🧪 Preflight checks..."
-command -v npm >/dev/null 2>&1 || { echo "❌ npm not found in PATH"; exit 1; }
-command -v ssh >/dev/null 2>&1 || { echo "❌ ssh not found in PATH"; exit 1; }
-command -v scp >/dev/null 2>&1 || { echo "❌ scp not found in PATH"; exit 1; }
-
-echo "🔐 SSH auth check..."
-if ssh -o BatchMode=yes -o ConnectTimeout=10 "$SERVER" "echo connected" >/dev/null 2>&1; then
-  echo "✅ SSH key auth available."
-else
-  echo "ℹ️  SSH key auth not configured. Interactive password prompts are expected."
-fi
-
-echo "🔨 Building OSS Dashboard..."
+# 1. Build the project
+echo "🔨 Step 1: Building production assets..."
+# Use npm run build. VITE_API_URL should be in .env or .env.production
 npm run build
 
-echo "📦 Uploading to $SERVER:$REMOTE_DIR ..."
-scp -r dist/* $SERVER:$REMOTE_DIR/
-
-echo "🔧 Setting permissions and reloading Nginx (you may be asked for sudo password)..."
-ssh -tt "$SERVER" "sudo sh -c 'chown -R www-data:www-data $REMOTE_DIR && nginx -t && systemctl reload nginx'"
-
-echo ""
-echo "✅ Dashboard deployed to VPS successfully!"
-echo "🌐 https://www.onestopdaily.shop"
-
-if [[ -t 1 && -z "${CI:-}" ]]; then
-  echo ""
-  read -rp "Press Enter to close..."
+# 2. Git Sync
+echo "🚀 Step 2: Syncing with Git..."
+git add .
+# Only commit if there are changes to avoid script failure
+if git diff-index --quiet HEAD --; then
+    echo "ℹ️  No changes to commit."
+else
+    echo "📝 Committing changes..."
+    git commit -m "Auto-deploy: reports fix and UI updates $(date +'%Y-%m-%d %H:%M:%S')"
+    echo "📤 Pushing to Git repository..."
+    git push
 fi
+
+# 3. Server Preparation
+echo "📦 Step 3: Preparing server..."
+# Ensure TMP_DIR exists and is empty on server
+ssh $SERVER "mkdir -p $TMP_DIR && rm -rf $TMP_DIR/*"
+
+# 4. Upload
+echo "📤 Step 4: Uploading build files to $SERVER..."
+# Upload the contents of the dist folder to the temp directory
+scp -r dist/* $SERVER:$TMP_DIR/
+
+# 5. Move to Web Root & Cleanup
+echo "🔧 Step 5: Moving files to web root and setting permissions..."
+# Use -tt to ensure we can provide sudo password if requested
+# We use sudo for operations on /var/www
+ssh -tt $SERVER "
+    echo '📂 Clearing remote directory...'
+    sudo rm -rf $REMOTE_DIR/*
+    echo '📂 Copying new files to web root...'
+    sudo cp -r $TMP_DIR/* $REMOTE_DIR/
+    echo '🔑 Setting ownership to www-data...'
+    sudo chown -R www-data:www-data $REMOTE_DIR
+    echo '🧹 Cleaning up temp directory...'
+    rm -rf $TMP_DIR
+    echo '🔄 Reloading Nginx...'
+    sudo nginx -t && sudo systemctl reload nginx
+"
+
+echo "--------------------------------------------------"
+echo "✅ Deployment Complete!"
+echo "🌐 URL: https://www.onestopdaily.shop"
+echo "--------------------------------------------------"
