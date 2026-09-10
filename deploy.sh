@@ -10,7 +10,12 @@ trap 'echo ""; echo "❌ DEPLOYMENT FAILED!"; echo "Check the error details abov
 
 # Configuration
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-PROJECT_ROOT="$( dirname "$SCRIPT_DIR" )"
+PROJECT_ROOT="$SCRIPT_DIR"
+if ! git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "❌ This script must run from inside the repo root."
+    echo "Expected Git repo: $PROJECT_ROOT"
+    exit 1
+fi
 cd "$PROJECT_ROOT"
 
 SERVER="sahan@74.208.132.78"

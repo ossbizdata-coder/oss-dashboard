@@ -23,7 +23,7 @@ const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 
 export default function StaffPage() {
   const { isSuperAdmin } = useAuth()
-  const [tab, setTab]                       = useState('employees')
+  const [tab, setTab]                       = useState('attendance')
   const [attendance, setAttendance]         = useState([])
   const [monthlySalaries, setMonthlySalaries] = useState([])
   const [monthlyShopData, setMonthlyShopData] = useState(null)
@@ -136,7 +136,7 @@ export default function StaffPage() {
 
   return (
     <div>
-      <PageHeader title="Staff & HR" subtitle="Employees · Salary · Performance"
+      <PageHeader title="Staff & HR" subtitle="Attendance · Salary"
         action={
           <button onClick={load} className="btn-outline flex items-center gap-2 text-sm">
             <RefreshCw size={15} /> Refresh
@@ -144,8 +144,8 @@ export default function StaffPage() {
         }
       />
 
-      {/* Month Switcher — only for Salary / Performance */}
-      {(tab === 'salary' || tab === 'performance') && (
+      {/* Month Switcher — only for Salary */}
+      {tab === 'salary' && (
         <div className="flex items-center gap-3 mb-5">
           <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
             <button onClick={() => setSelectedMonth(d => startOfMonth(subMonths(d, 1)))}
@@ -173,9 +173,8 @@ export default function StaffPage() {
       {/* Tabs */}
       <div className="flex gap-2 mb-5">
         {[
-          { key:'employees',   label:'Employees',   icon:Users },
+          { key:'attendance', label:'Attendance', icon:Users },
           ...(isSuperAdmin ? [{ key:'salary', label:'Salary', icon:DollarSign }] : []),
-          { key:'performance', label:'Performance', icon:TrendingUp },
         ].map(({ key, label, icon:Icon }) => (
           <button key={key} onClick={() => setTab(key)}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors ${
@@ -188,8 +187,8 @@ export default function StaffPage() {
 
       {loading ? <LoadingSpinner /> : (
         <>
-          {/* ══════════ TAB 1: EMPLOYEES ══════════ */}
-          {tab === 'employees' && (
+          {/* ══════════ TAB 1: ATTENDANCE ══════════ */}
+          {tab === 'attendance' && (
             <div className="space-y-5">
               {/* Date switcher */}
               <div className="flex items-center gap-3">
@@ -361,103 +360,6 @@ export default function StaffPage() {
             </div>
           )}
 
-          {/* ══════════ TAB 3: PERFORMANCE ══════════ */}
-          {tab === 'performance' && (
-            <div className="space-y-5">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-                {SHOPS.map(code => {
-                  const meta       = STAFF_SHOP[code]
-                  const Icon       = meta.icon
-                  const monthly    = monthlyShopData?.shops?.find(s => s.shopCode === code) || {}
-                  const todayD     = todayShopData[code]
-                  const mTarget    = MONTHLY_TARGETS[code]
-                  const dTarget    = DAILY_TARGETS[code]
-                  const mSales     = monthly.totalSales || 0
-                  const tSales     = todayD?.totalSales || 0
-                  const pct        = mTarget > 0 ? Math.min((mSales/mTarget)*100,100) : 0
-                  const tPct       = dTarget > 0 ? Math.min((tSales/dTarget)*100,100) : 0
-                  const shortfall  = Math.max(mTarget-mSales,0)
-                  const overPerf   = Math.max(mSales-mTarget,0)
-                  const bonus      = overPerf * 0.05
-                  const achieved   = mSales >= mTarget
-
-                  return (
-                    <div key={code} className="card">
-                      <div className="flex items-center gap-3 mb-4">
-                        <div className={`w-10 h-10 ${meta.bg} rounded-xl flex items-center justify-center flex-shrink-0`}>
-                          <Icon size={20} className="text-white" />
-                        </div>
-                        <div>
-                          <p className="font-bold text-gray-800">{meta.name}</p>
-                          <p className="text-xs text-gray-400">{meta.label}</p>
-                        </div>
-                        {achieved && <span className="ml-auto text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full font-medium">🎉 Met!</span>}
-                      </div>
-
-                      {/* Monthly progress */}
-                      <div className="mb-4">
-                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                          <span>Monthly Target</span>
-                          <span className="font-semibold text-gray-700">{pct.toFixed(0)}%</span>
-                        </div>
-                        <div className="h-3 bg-gray-100 rounded-full overflow-hidden">
-                          <div className={`h-3 rounded-full transition-all ${achieved ? 'bg-green-500' : pct >= 70 ? 'bg-yellow-400' : 'bg-red-400'}`}
-                            style={{ width:`${pct}%` }} />
-                        </div>
-                        <div className="flex justify-between text-xs mt-1">
-                          <span className="text-gray-500">Sales: <span className="font-bold text-gray-700">{formatRs(mSales)}</span></span>
-                          <span className="text-gray-400">of {formatRs(mTarget)}</span>
-                        </div>
-                      </div>
-
-                      {/* Today */}
-                      <div className="bg-gray-50 rounded-xl p-3 mb-3">
-                        <div className="flex justify-between text-xs text-gray-500 mb-1">
-                          <span>Today</span>
-                          <span className="font-semibold">{tPct.toFixed(0)}% of daily target</span>
-                        </div>
-                        <div className="h-2 bg-gray-200 rounded-full overflow-hidden mb-1">
-                          <div className={`h-2 rounded-full ${tSales >= dTarget ? 'bg-green-500' : 'bg-blue-400'}`}
-                            style={{ width:`${tPct}%` }} />
-                        </div>
-                        <div className="flex justify-between text-xs">
-                          <span className="font-bold text-gray-700">{formatRs(tSales)}</span>
-                          <span className="text-gray-400">target {formatRs(dTarget)}</span>
-                        </div>
-                      </div>
-
-                      {/* Result */}
-                      <div className="space-y-1.5 text-xs">
-                        {shortfall > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-red-500">Shortfall</span>
-                            <span className="font-semibold text-red-600">{formatRs(shortfall)}</span>
-                          </div>
-                        )}
-                        {overPerf > 0 && <>
-                          <div className="flex justify-between">
-                            <span className="text-green-600">Over-performance</span>
-                            <span className="font-semibold text-green-700">{formatRs(overPerf)}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-purple-600">Est. Bonus (5%)</span>
-                            <span className="font-semibold text-purple-700">{formatRs(bonus)}</span>
-                          </div>
-                        </>}
-                        <div className="flex justify-between border-t pt-1.5 mt-1">
-                          <span className="text-gray-400">Days recorded</span>
-                          <span className="font-medium text-gray-600">{monthly.daysRecorded ?? 0}</span>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-              <p className="text-xs text-gray-400 text-center">
-                Monthly targets — CAFE {formatRs(MONTHLY_TARGETS.CAFE)} · Bookshop {formatRs(MONTHLY_TARGETS.BOOKSHOP)} · FoodHut {formatRs(MONTHLY_TARGETS.FOODHUT)} · Bonus = 5% over-performance
-              </p>
-            </div>
-          )}
         </>
       )}
     </div>
