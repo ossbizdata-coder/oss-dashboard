@@ -1,8 +1,9 @@
 import axios from 'axios'
 
-// Get the base URL and ensure it has /api appended automatically.
+// Get the base URL and ensure it has exactly one /api suffix.
 const ENV_URL = import.meta.env.VITE_API_URL || ''
-const BASE_URL = `${ENV_URL.replace(/\/$/, '')}/api`
+const cleanEnvUrl = ENV_URL.trim().replace(/\/+$/, '').replace(/(?:\/api)+$/i, '')
+const BASE_URL = cleanEnvUrl ? `${cleanEnvUrl}/api` : '/api'
 
 const api = axios.create({
   baseURL: BASE_URL,
@@ -11,9 +12,19 @@ const api = axios.create({
 
 // Inject JWT token automatically (skip login endpoint to avoid stale-token login failures).
 api.interceptors.request.use((config) => {
+  const baseURL = config.baseURL || ''
+  const normalizedUrl = String(config.url || '').replace(/^\/+/, '')
+
+  // Keep requests relative and guard against accidental /api/api/*.
+  if (/\/api\/?$/i.test(baseURL) && /^api\//i.test(normalizedUrl)) {
+    config.url = normalizedUrl.replace(/^api\/+/i, '')
+  } else {
+    config.url = normalizedUrl
+  }
+
   const token = localStorage.getItem('token')
   const url = String(config.url || '')
-  const isAuthLogin = url.includes('/auth/login')
+  const isAuthLogin = url.includes('auth/login')
   if (token && !isAuthLogin) config.headers.Authorization = `Bearer ${token}`
   return config
 })

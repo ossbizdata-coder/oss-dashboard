@@ -76,7 +76,7 @@ export default function ShopDetailPage() {
         // If backend returned no rows for by-date, try the alternate by-shop endpoint (some servers expose this)
         if ((!tx || tx.length === 0) && shopCode) {
           try {
-            const alt = await api.get('/api/transactions/by-shop', { params: { shopCode, date: dateStr } })
+            const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr } })
             console.debug('transactions response (by-shop):', alt.data)
             tx = alt.data || []
           } catch (err) {
@@ -93,7 +93,7 @@ export default function ShopDetailPage() {
         // attempt fallback to by-shop when initial call failed
         if (shopCode) {
           try {
-            const alt = await api.get('/api/transactions/by-shop', { params: { shopCode, date: dateStr } })
+            const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr } })
             console.debug('transactions response (by-shop fallback):', alt.data)
             setTransactions(alt.data || [])
             setTransactionsError(null)
@@ -377,4 +377,3 @@ export default function ShopDetailPage() {
     </div>
   )
 }
-

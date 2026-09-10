@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "deploy": "bash server/deploy-dashboard.sh",
     "preview": "vite preview",
     "lint": "eslint src --ext .jsx,.js"
   },
@@ -30,4 +31,3 @@
     "eslint-plugin-react-hooks": "^4.6.0"
   }
 }
-
