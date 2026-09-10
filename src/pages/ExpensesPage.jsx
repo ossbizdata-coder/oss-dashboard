@@ -150,11 +150,13 @@ export default function ExpensesPage() {
           className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-1.5 text-gray-700 outline-none hover:border-gray-300 focus:ring-2 focus:ring-primary-400"
         >
           <option value="">All Expense Types</option>
-          {expenseTypes.map(type => (
-            <option key={type.id} value={type.id}>
-              {type.name}
-            </option>
-          ))}
+          {expenseTypes
+            .sort((a, b) => (a.name || '').localeCompare(b.name || ''))
+            .map(type => (
+              <option key={type.id} value={type.id}>
+                {type.name}
+              </option>
+            ))}
         </select>
         
         {!isToday && (

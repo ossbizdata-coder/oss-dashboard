@@ -13,6 +13,8 @@ export default function CreditsPage() {
   const [filter, setFilter] = useState('all')
   const [shopFilter, setShopFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
+  const [sortColumn, setSortColumn] = useState('createdAt') // 'userName', 'amount', 'createdAt', 'isPaid'
+  const [sortDir, setSortDir] = useState('desc') // 'asc' or 'desc'
   const [paying, setPaying] = useState(null)
 
   const load = async () => {
@@ -32,10 +34,41 @@ export default function CreditsPage() {
     setPaying(null)
   }
 
+  const toggleSort = (column) => {
+    if (sortColumn === column) {
+      setSortDir(sortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSortColumn(column)
+      setSortDir('asc')
+    }
+  }
+
+  const getSortIndicator = (column) => {
+    if (sortColumn !== column) return ' ↕'
+    return sortDir === 'asc' ? ' ↑' : ' ↓'
+  }
+
   const filtered = credits
     .filter(c => filter === 'all' ? true : filter === 'unpaid' ? !c.isPaid : c.isPaid)
     .filter(c => shopFilter === 'all' ? true : (c.department || 'COMMON') === shopFilter)
     .filter(c => userFilter === 'all' ? true : c.userName === userFilter)
+    .sort((a, b) => {
+      let aVal, bVal
+      if (sortColumn === 'userName') {
+        aVal = (a.userName || '').toLowerCase()
+        bVal = (b.userName || '').toLowerCase()
+      } else if (sortColumn === 'amount') {
+        aVal = a.amount || 0
+        bVal = b.amount || 0
+      } else if (sortColumn === 'isPaid') {
+        aVal = a.isPaid ? 1 : 0
+        bVal = b.isPaid ? 1 : 0
+      } else {
+        aVal = new Date(a.createdAt || 0).getTime()
+        bVal = new Date(b.createdAt || 0).getTime()
+      }
+      return sortDir === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : (aVal > bVal ? -1 : aVal < bVal ? 1 : 0)
+    })
 
   const uniqueUsers = [...new Set(credits.map(c => c.userName).filter(Boolean))].sort()
 

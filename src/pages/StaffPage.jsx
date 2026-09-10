@@ -32,6 +32,8 @@ export default function StaffPage() {
   const [loading, setLoading]               = useState(true)
   const [selectedMonth, setSelectedMonth]   = useState(startOfMonth(new Date()))
   const [selectedDate, setSelectedDate]     = useState(new Date())
+  const [salarySortCol, setSalarySortCol]   = useState('name')
+  const [salarySortDir, setSalarySortDir]   = useState('asc')
 
   const year  = selectedMonth.getFullYear()
   const month = selectedMonth.getMonth() + 1
@@ -76,6 +78,17 @@ export default function StaffPage() {
   useEffect(() => { load() }, [year, month])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
+  const toggleSalarySort = (col) => {
+    if (salarySortCol === col) {
+      setSalarySortDir(salarySortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSalarySortCol(col)
+      setSalarySortDir('asc')
+    }
+  }
+
+  const getSortInd = (col) => salarySortCol === col ? (salarySortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
+
   const adminAtt = attendance.filter(a => a.userRole === 'ADMIN' || a.userRole === 'SUPERADMIN')
 
   // Selected date attendance — deduplicated
@@ -100,7 +113,23 @@ export default function StaffPage() {
   // Show only ADMIN and SUPERADMIN salaries, regardless of attendance
   const adminSalaries = monthlySalaries.filter(s => 
     s.userRole === 'ADMIN' || s.userRole === 'SUPERADMIN'
-  )
+  ).sort((a, b) => {
+    let aVal, bVal
+    if (salarySortCol === 'name') {
+      aVal = (a.name || '').toLowerCase()
+      bVal = (b.name || '').toLowerCase()
+    } else if (salarySortCol === 'salary') {
+      aVal = a.totalSalary || 0
+      bVal = b.totalSalary || 0
+    } else if (salarySortCol === 'gross') {
+      aVal = (a.baseSalary ?? a.totalSalary) || 0
+      bVal = (b.baseSalary ?? b.totalSalary) || 0
+    } else if (salarySortCol === 'days') {
+      aVal = a.workDays || 0
+      bVal = b.workDays || 0
+    }
+    return salarySortDir === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : (aVal > bVal ? -1 : aVal < bVal ? 1 : 0)
+  })
 
   const workingCount    = todayAdmins.filter(a => a.status === 'WORKING').length
   const notWorkingCount = todayAdmins.filter(a => a.status !== 'WORKING').length
@@ -281,13 +310,13 @@ export default function StaffPage() {
                     <table className="w-full text-sm">
                       <thead>
                         <tr className="text-left text-gray-500 border-b border-gray-100">
-                          <th className="pb-3 pr-4 font-medium">Name</th>
+                          <th onClick={() => toggleSalarySort('name')} className="pb-3 pr-4 font-medium cursor-pointer hover:text-primary-600">Name{getSortInd('name')}</th>
                           <th className="pb-3 pr-4 font-medium text-right">Daily Rate</th>
-                          <th className="pb-3 pr-4 font-medium text-right">Days</th>
+                          <th onClick={() => toggleSalarySort('days')} className="pb-3 pr-4 font-medium text-right cursor-pointer hover:text-primary-600">Days{getSortInd('days')}</th>
                           <th className="pb-3 pr-4 font-medium text-right">Overtime</th>
-                          <th className="pb-3 pr-4 font-medium text-right">Gross</th>
+                          <th onClick={() => toggleSalarySort('gross')} className="pb-3 pr-4 font-medium text-right cursor-pointer hover:text-primary-600">Gross{getSortInd('gross')}</th>
                           <th className="pb-3 pr-4 font-medium text-right text-red-500">Credits Owed</th>
-                          <th className="pb-3 font-medium text-right text-purple-600">Net Pay</th>
+                          <th onClick={() => toggleSalarySort('salary')} className="pb-3 font-medium text-right text-purple-600 cursor-pointer hover:text-primary-600">Net Pay{getSortInd('salary')}</th>
                         </tr>
                       </thead>
                       <tbody>
