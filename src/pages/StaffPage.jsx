@@ -97,7 +97,10 @@ export default function StaffPage() {
   })
 
   const adminUserIds = new Set(adminAtt.map(a => a.userId).filter(Boolean))
-  const adminSalaries = monthlySalaries.filter(s => adminUserIds.has(s.userId) || adminUserIds.size === 0)
+  // Show only ADMIN and SUPERADMIN salaries, regardless of attendance
+  const adminSalaries = monthlySalaries.filter(s => 
+    s.userRole === 'ADMIN' || s.userRole === 'SUPERADMIN'
+  )
 
   const workingCount    = todayAdmins.filter(a => a.status === 'WORKING').length
   const notWorkingCount = todayAdmins.filter(a => a.status !== 'WORKING').length

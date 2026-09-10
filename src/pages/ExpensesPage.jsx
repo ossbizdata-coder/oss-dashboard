@@ -17,6 +17,7 @@ export default function ExpensesPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [shopData, setShopData]   = useState({}) // code → { expenses, totalExpenses, locked, dailyCashId }
   const [expenseTypes, setExpenseTypes] = useState([])
+  const [filterExpenseTypeId, setFilterExpenseTypeId] = useState(null) // null = show all
   const [loading, setLoading]     = useState(true)
   const [editItem, setEditItem]   = useState(null)   // { ...expense, shopCode }
   const [saving, setSaving]       = useState(false)
@@ -54,7 +55,19 @@ export default function ExpensesPage() {
 
   useEffect(() => { load() }, [dateStr])
 
-  const grandTotal = SHOPS.reduce((sum, s) => sum + (shopData[s.code]?.totalExpenses || 0), 0)
+  const filteredShopData = Object.entries(shopData).reduce((acc, [code, shop]) => {
+    const filteredExpenses = filterExpenseTypeId 
+      ? shop.expenses.filter(e => e.expenseTypeId === filterExpenseTypeId)
+      : shop.expenses
+    acc[code] = {
+      ...shop,
+      expenses: filteredExpenses,
+      totalExpenses: filteredExpenses.reduce((sum, e) => sum + (e.amount || 0), 0),
+    }
+    return acc
+  }, {})
+
+  const grandTotal = SHOPS.reduce((sum, s) => sum + (filteredShopData[s.code]?.totalExpenses || 0), 0)
 
   // ── Edit ─────────────────────────────────────────────────────────────────────
   const openEdit = (expense, shopCode) => setEditItem({
@@ -110,8 +123,8 @@ export default function ExpensesPage() {
         }
       />
 
-      {/* Date Navigator */}
-      <div className="flex items-center gap-3 mb-6">
+      {/* Date Navigator + Expense Type Filter */}
+      <div className="flex items-center gap-3 mb-6 flex-wrap">
         <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
           <button onClick={() => setSelectedDate(d => subDays(d, 1))}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
@@ -129,6 +142,21 @@ export default function ExpensesPage() {
             <ChevronRight size={16} />
           </button>
         </div>
+        
+        {/* Expense Type Filter */}
+        <select
+          value={filterExpenseTypeId || ''}
+          onChange={e => setFilterExpenseTypeId(e.target.value ? parseInt(e.target.value) : null)}
+          className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-1.5 text-gray-700 outline-none hover:border-gray-300 focus:ring-2 focus:ring-primary-400"
+        >
+          <option value="">All Expense Types</option>
+          {expenseTypes.map(type => (
+            <option key={type.id} value={type.id}>
+              {type.name}
+            </option>
+          ))}
+        </select>
+        
         {!isToday && (
           <button onClick={() => setSelectedDate(new Date())}
             className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
@@ -146,7 +174,7 @@ export default function ExpensesPage() {
       {loading ? <LoadingSpinner /> : (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
           {SHOPS.map(({ code, label, color, textColor, lightBg }) => {
-            const shop = shopData[code] || { expenses: [], totalExpenses: 0 }
+            const shop = filteredShopData[code] || { expenses: [], totalExpenses: 0 }
             const expenses = shop.expenses
 
             return (
@@ -169,7 +197,9 @@ export default function ExpensesPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    {expenses.map(exp => (
+                    {expenses
+                      .filter(exp => !filterExpenseTypeId || exp.expenseTypeId === filterExpenseTypeId)
+                      .map(exp => (
                       <div key={exp.id}
                         className={`${lightBg} rounded-xl px-3 py-2 flex items-start gap-2 group`}>
                         <div className="flex-1 min-w-0">
