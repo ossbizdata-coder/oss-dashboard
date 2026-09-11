@@ -109,11 +109,8 @@ export default function StaffPage() {
     if (a.status === 'WORKING') daysWorkedByName[a.userName] = (daysWorkedByName[a.userName] || 0) + 1
   })
 
-  const adminUserIds = new Set(adminAtt.map(a => a.userId).filter(Boolean))
-  // Show only ADMIN and SUPERADMIN salaries, regardless of attendance
-  const adminSalaries = monthlySalaries.filter(s => 
-    s.userRole === 'ADMIN' || s.userRole === 'SUPERADMIN'
-  ).sort((a, b) => {
+  // Show all salary rows returned by backend for the selected month.
+  const staffSalaries = monthlySalaries.filter(Boolean).sort((a, b) => {
     let aVal, bVal
     if (salarySortCol === 'name') {
       aVal = (a.name || '').toLowerCase()
@@ -277,29 +274,29 @@ export default function StaffPage() {
           {/* ══════════ TAB 2: SALARY ══════════ */}
           {tab === 'salary' && (
             <div className="space-y-5">
-              {adminSalaries.length === 0 ? (
+              {staffSalaries.length === 0 ? (
                 <div className="card text-center text-gray-400 py-8">No salary data for {MONTHS[month-1]} {year}</div>
               ) : (
                 <>
                   {/* Summary tiles */}
                   <div className="grid grid-cols-4 gap-4">
                     <div className="card text-center py-3 bg-gradient-to-br from-blue-50 to-white border-blue-100">
-                      <p className="text-2xl font-bold text-blue-700">{adminSalaries.length}</p>
+                      <p className="text-2xl font-bold text-blue-700">{staffSalaries.length}</p>
                       <p className="text-xs text-gray-500 mt-1">Staff</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-green-50 to-white border-green-100">
-                      <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s+((r.baseSalary ?? r.totalSalary) || 0),0))}</p>
+                      <p className="text-xl font-bold text-green-700">{formatRs(staffSalaries.reduce((s,r) => s+((r.baseSalary ?? r.totalSalary) || 0),0))}</p>
                       <p className="text-xs text-gray-500 mt-1">Gross Salary</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-red-50 to-white border-red-100">
                       <p className="text-xl font-bold text-red-600">
-                        {formatRs(adminSalaries.reduce((s,r) => s+((r.unpaidCredits ?? unpaidCreditsMap[r.userId])||0),0))}
+                        {formatRs(staffSalaries.reduce((s,r) => s+((r.unpaidCredits ?? unpaidCreditsMap[r.userId])||0),0))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Credits Deduction</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-purple-50 to-white border-purple-100">
                       <p className="text-xl font-bold text-purple-700">
-                        {formatRs(adminSalaries.reduce((s,r) => s+((r.totalSalary||0)),0))}
+                        {formatRs(staffSalaries.reduce((s,r) => s+((r.totalSalary||0)),0))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Net Payable</p>
                     </div>
@@ -319,7 +316,7 @@ export default function StaffPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {adminSalaries.map((s, i) => {
+                        {staffSalaries.map((s, i) => {
                           const owed   = (s.unpaidCredits ?? unpaidCreditsMap[s.userId]) || 0
                           const gross  = (s.baseSalary ?? s.totalSalary) || 0
                           const net    = s.totalSalary || 0
