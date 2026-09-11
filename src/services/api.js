@@ -86,6 +86,7 @@ export const creditApi = {
 // ── ATTENDANCE ─────────────────────────────────────────────────────────────
 export const attendanceApi = {
   getAll: () => api.get('/attendance/all'),
+  getHistory: () => api.get('/attendance/history'),
   getToday: () => api.get('/attendance/today'),
 }
 
