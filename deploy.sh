@@ -80,9 +80,10 @@ ssh $SSH_OPTS "$SERVER" "mkdir -p '$TMP_DIR' && rm -rf '$TMP_DIR/dist'"
 scp $SSH_OPTS -r dist "$SERVER:$TMP_DIR/"
 
 echo "🔧 Deploying on VPS..."
-ssh $SSH_OPTS "$SERVER" "
+ssh -tt $SSH_OPTS "$SERVER" "
     set -euo pipefail
     test -f '$TMP_DIR/dist/index.html'
+    sudo -v
     sudo mkdir -p '$REMOTE_DIR'
     sudo rm -rf '$REMOTE_DIR'/*
     sudo cp -r '$TMP_DIR/dist/'* '$REMOTE_DIR/'
