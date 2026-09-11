@@ -18,8 +18,15 @@ const STAFF_SHOP = {
 }
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 const SHOPS  = ['CAFE','BOOKSHOP','FOODHUT']
+const ADMIN_ROLES = new Set(['ADMIN', 'SUPERADMIN'])
 
 const todayStr = () => format(new Date(), 'yyyy-MM-dd')
+const toNumber = (v) => {
+  const n = Number(v)
+  return Number.isFinite(n) ? n : 0
+}
+const toRole = (v) => String(v || '').toUpperCase()
+const toNameKey = (v) => String(v || '').trim().toLowerCase()
 
 export default function StaffPage() {
   const { isSuperAdmin } = useAuth()
@@ -105,25 +112,66 @@ export default function StaffPage() {
     .filter(a => { const k = `${a.userId??a.userEmail}_${a.workDate}`; if (seenM.has(k)) return false; seenM.add(k); return true })
 
   const daysWorkedByName = {}
+  const daysWorkedByUserId = {}
   monthAdmins.forEach(a => {
-    if (a.status === 'WORKING') daysWorkedByName[a.userName] = (daysWorkedByName[a.userName] || 0) + 1
+    if (a.status === 'WORKING') {
+      daysWorkedByName[a.userName] = (daysWorkedByName[a.userName] || 0) + 1
+      if (a.userId != null) daysWorkedByUserId[String(a.userId)] = (daysWorkedByUserId[String(a.userId)] || 0) + 1
+    }
   })
 
-  // Show all salary rows returned by backend for the selected month.
-  const staffSalaries = monthlySalaries.filter(Boolean).sort((a, b) => {
+  const adminUserIds = new Set(adminAtt.map(a => (a.userId != null ? String(a.userId) : '')).filter(Boolean))
+  const adminNames = new Set(adminAtt.map(a => toNameKey(a.userName)).filter(Boolean))
+
+  const getSalaryUserId = (row = {}) => {
+    if (row.userId != null) return String(row.userId)
+    if (row.user?.id != null) return String(row.user.id)
+    return ''
+  }
+  const getSalaryName = (row = {}) => row.name || row.userName || row.user?.name || ''
+  const getSalaryDaysRaw = (row = {}) =>
+    toNumber(row.workDays ?? row.daysWorked ?? row.workingDays ?? row.totalWorkDays ?? 0)
+  const getAttendanceDays = (row = {}) => {
+    const uid = getSalaryUserId(row)
+    if (uid && daysWorkedByUserId[uid] != null) return toNumber(daysWorkedByUserId[uid])
+    return toNumber(daysWorkedByName[getSalaryName(row)] || 0)
+  }
+  const getDisplayDays = (row = {}) => {
+    const salaryDays = getSalaryDaysRaw(row)
+    return salaryDays > 0 ? salaryDays : getAttendanceDays(row)
+  }
+  const getDisplayCredits = (row = {}) => {
+    const raw = row.unpaidCredits ?? row.creditsOwed ?? row.totalUnpaidCredits
+    if (raw != null) return toNumber(raw)
+    const uid = getSalaryUserId(row)
+    if (uid && unpaidCreditsMap[uid] != null) return toNumber(unpaidCreditsMap[uid])
+    return 0
+  }
+
+  // Show only ADMIN / SUPERADMIN salary rows.
+  // Some salary rows may omit role fields, so also allow matches by known admin attendance users.
+  const adminSalaries = monthlySalaries.filter((row) => {
+    if (!row) return false
+    const role = toRole(row.userRole || row.role || row.user?.role)
+    if (ADMIN_ROLES.has(role)) return true
+    const uid = getSalaryUserId(row)
+    if (uid && adminUserIds.has(uid)) return true
+    const nameKey = toNameKey(getSalaryName(row))
+    return !!nameKey && adminNames.has(nameKey)
+  }).sort((a, b) => {
     let aVal, bVal
     if (salarySortCol === 'name') {
-      aVal = (a.name || '').toLowerCase()
-      bVal = (b.name || '').toLowerCase()
+      aVal = toNameKey(getSalaryName(a))
+      bVal = toNameKey(getSalaryName(b))
     } else if (salarySortCol === 'salary') {
-      aVal = a.totalSalary || 0
-      bVal = b.totalSalary || 0
+      aVal = toNumber(a.totalSalary)
+      bVal = toNumber(b.totalSalary)
     } else if (salarySortCol === 'gross') {
-      aVal = (a.baseSalary ?? a.totalSalary) || 0
-      bVal = (b.baseSalary ?? b.totalSalary) || 0
+      aVal = toNumber(a.baseSalary ?? a.totalSalary)
+      bVal = toNumber(b.baseSalary ?? b.totalSalary)
     } else if (salarySortCol === 'days') {
-      aVal = a.workDays || 0
-      bVal = b.workDays || 0
+      aVal = getDisplayDays(a)
+      bVal = getDisplayDays(b)
     }
     return salarySortDir === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : (aVal > bVal ? -1 : aVal < bVal ? 1 : 0)
   })
@@ -274,29 +322,29 @@ export default function StaffPage() {
           {/* ══════════ TAB 2: SALARY ══════════ */}
           {tab === 'salary' && (
             <div className="space-y-5">
-              {staffSalaries.length === 0 ? (
+              {adminSalaries.length === 0 ? (
                 <div className="card text-center text-gray-400 py-8">No salary data for {MONTHS[month-1]} {year}</div>
               ) : (
                 <>
                   {/* Summary tiles */}
                   <div className="grid grid-cols-4 gap-4">
                     <div className="card text-center py-3 bg-gradient-to-br from-blue-50 to-white border-blue-100">
-                      <p className="text-2xl font-bold text-blue-700">{staffSalaries.length}</p>
+                      <p className="text-2xl font-bold text-blue-700">{adminSalaries.length}</p>
                       <p className="text-xs text-gray-500 mt-1">Staff</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-green-50 to-white border-green-100">
-                      <p className="text-xl font-bold text-green-700">{formatRs(staffSalaries.reduce((s,r) => s+((r.baseSalary ?? r.totalSalary) || 0),0))}</p>
+                      <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s + toNumber(r.baseSalary ?? r.totalSalary), 0))}</p>
                       <p className="text-xs text-gray-500 mt-1">Gross Salary</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-red-50 to-white border-red-100">
                       <p className="text-xl font-bold text-red-600">
-                        {formatRs(staffSalaries.reduce((s,r) => s+((r.unpaidCredits ?? unpaidCreditsMap[r.userId])||0),0))}
+                        {formatRs(adminSalaries.reduce((s,r) => s + getDisplayCredits(r), 0))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Credits Deduction</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-purple-50 to-white border-purple-100">
                       <p className="text-xl font-bold text-purple-700">
-                        {formatRs(staffSalaries.reduce((s,r) => s+((r.totalSalary||0)),0))}
+                        {formatRs(adminSalaries.reduce((s,r) => s + toNumber(r.totalSalary), 0))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Net Payable</p>
                     </div>
@@ -316,22 +364,23 @@ export default function StaffPage() {
                         </tr>
                       </thead>
                       <tbody>
-                        {staffSalaries.map((s, i) => {
-                          const owed   = (s.unpaidCredits ?? unpaidCreditsMap[s.userId]) || 0
-                          const gross  = (s.baseSalary ?? s.totalSalary) || 0
-                          const net    = s.totalSalary || 0
+                        {adminSalaries.map((s, i) => {
+                          const owed   = getDisplayCredits(s)
+                          const gross  = toNumber(s.baseSalary ?? s.totalSalary)
+                          const net    = toNumber(s.totalSalary)
+                          const days   = getDisplayDays(s)
                           return (
                             <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
                               <td className="py-3 pr-4 font-medium text-gray-800">
                                 <div className="flex items-center gap-2">
                                   <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
-                                    {(s.name||'?').charAt(0)}
+                                    {(getSalaryName(s)||'?').charAt(0)}
                                   </div>
-                                  {s.name}
+                                  {getSalaryName(s)}
                                 </div>
                               </td>
                               <td className="py-3 pr-4 text-right text-gray-600">{formatRs(s.dailyRate)}</td>
-                              <td className="py-3 pr-4 text-right text-gray-600">{s.workDays ?? '—'}</td>
+                              <td className="py-3 pr-4 text-right text-gray-600">{days || '—'}</td>
                               <td className="py-3 pr-4 text-right text-gray-500 text-xs">
                                 {(s.totalOvertimeHours||0) > 0 ? `+${s.totalOvertimeHours}h` : '—'}
                               </td>
