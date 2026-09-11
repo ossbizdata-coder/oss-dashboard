@@ -20,13 +20,16 @@ const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov
 const SHOPS  = ['CAFE','BOOKSHOP','FOODHUT']
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPERADMIN'])
 
-const todayStr = () => format(new Date(), 'yyyy-MM-dd')
 const toNumber = (v) => {
   const n = Number(v)
   return Number.isFinite(n) ? n : 0
 }
 const toRole = (v) => String(v || '').toUpperCase()
 const toNameKey = (v) => String(v || '').trim().toLowerCase()
+const getAttendanceOvertimeHours = (row = {}) =>
+  toNumber(row.overtimeHours ?? row.totalOvertimeHours ?? row.overtime ?? row.otHours ?? row.extraHours ?? 0)
+const getAttendanceOffOfficeHours = (row = {}) =>
+  toNumber(row.offOfficeHours ?? row.outsideOfficeHours ?? row.offsiteHours ?? row.offHours ?? row.outsideHours ?? 0)
 
 export default function StaffPage() {
   const { isSuperAdmin } = useAuth()
@@ -35,7 +38,8 @@ export default function StaffPage() {
   const [monthlySalaries, setMonthlySalaries] = useState([])
   const [monthlyShopData, setMonthlyShopData] = useState(null)
   const [todayShopData, setTodayShopData]   = useState({})
-  const [unpaidCreditsMap, setUnpaidCreditsMap] = useState({}) // userId → totalUnpaid
+  const [unpaidCreditsByUserId, setUnpaidCreditsByUserId] = useState({})
+  const [unpaidCreditsByName, setUnpaidCreditsByName] = useState({})
   const [loading, setLoading]               = useState(true)
   const [selectedMonth, setSelectedMonth]   = useState(startOfMonth(new Date()))
   const [selectedDate, setSelectedDate]     = useState(new Date())
@@ -66,13 +70,21 @@ export default function StaffPage() {
       if (att.status === 'fulfilled')         setAttendance(att.value.data || [])
       if (sal.status === 'fulfilled')         setMonthlySalaries((sal.value && sal.value.data) || [])
       if (shopMonthly.status === 'fulfilled') setMonthlyShopData(shopMonthly.value.data)
-      // Build unpaid credits map: userId → total unpaid
+      // Build unpaid credits maps for robust lookup from salary rows.
       if (credits.status === 'fulfilled') {
-        const map = {}
+        const byUserId = {}
+        const byName = {}
         ;(credits.value.data || []).filter(c => !c.isPaid).forEach(c => {
-          if (c.userId) map[c.userId] = (map[c.userId] || 0) + (c.amount || 0)
+          const amount = toNumber(c.amount)
+          if (c.userId != null) {
+            const key = String(c.userId)
+            byUserId[key] = (byUserId[key] || 0) + amount
+          }
+          const nameKey = toNameKey(c.userName || c.user?.name)
+          if (nameKey) byName[nameKey] = (byName[nameKey] || 0) + amount
         })
-        setUnpaidCreditsMap(map)
+        setUnpaidCreditsByUserId(byUserId)
+        setUnpaidCreditsByName(byName)
       }
       const todayMap = {}
       shopTodays.forEach((r, i) => {
@@ -113,11 +125,16 @@ export default function StaffPage() {
 
   const daysWorkedByName = {}
   const daysWorkedByUserId = {}
+  const monthHoursByName = {}
   monthAdmins.forEach(a => {
+    const name = a.userName || 'Unknown'
+    if (!monthHoursByName[name]) monthHoursByName[name] = { overtime: 0, offOffice: 0 }
     if (a.status === 'WORKING') {
-      daysWorkedByName[a.userName] = (daysWorkedByName[a.userName] || 0) + 1
+      daysWorkedByName[name] = (daysWorkedByName[name] || 0) + 1
       if (a.userId != null) daysWorkedByUserId[String(a.userId)] = (daysWorkedByUserId[String(a.userId)] || 0) + 1
     }
+    monthHoursByName[name].overtime += getAttendanceOvertimeHours(a)
+    monthHoursByName[name].offOffice += getAttendanceOffOfficeHours(a)
   })
 
   const adminUserIds = new Set(adminAtt.map(a => (a.userId != null ? String(a.userId) : '')).filter(Boolean))
@@ -144,8 +161,25 @@ export default function StaffPage() {
     const raw = row.unpaidCredits ?? row.creditsOwed ?? row.totalUnpaidCredits
     if (raw != null) return toNumber(raw)
     const uid = getSalaryUserId(row)
-    if (uid && unpaidCreditsMap[uid] != null) return toNumber(unpaidCreditsMap[uid])
+    if (uid && unpaidCreditsByUserId[uid] != null) return toNumber(unpaidCreditsByUserId[uid])
+    const nameKey = toNameKey(getSalaryName(row))
+    if (nameKey && unpaidCreditsByName[nameKey] != null) return toNumber(unpaidCreditsByName[nameKey])
     return 0
+  }
+  const getDisplayGross = (row = {}) => {
+    const rawGross = toNumber(row.baseSalary ?? row.grossSalary ?? row.totalBeforeDeductions ?? row.totalSalary)
+    if (rawGross > 0) return rawGross
+    const dailyRate = toNumber(row.dailyRate ?? row.ratePerDay)
+    const days = getDisplayDays(row)
+    if (dailyRate > 0 && days > 0) return dailyRate * days
+    return rawGross
+  }
+  const getDisplayNet = (row = {}) => {
+    const rawNet = toNumber(row.totalSalary ?? row.netSalary ?? row.payableSalary)
+    if (rawNet > 0) return rawNet
+    const fallbackGross = getDisplayGross(row)
+    if (fallbackGross <= 0) return rawNet
+    return Math.max(fallbackGross - getDisplayCredits(row), 0)
   }
 
   // Show only ADMIN / SUPERADMIN salary rows.
@@ -164,11 +198,11 @@ export default function StaffPage() {
       aVal = toNameKey(getSalaryName(a))
       bVal = toNameKey(getSalaryName(b))
     } else if (salarySortCol === 'salary') {
-      aVal = toNumber(a.totalSalary)
-      bVal = toNumber(b.totalSalary)
+      aVal = getDisplayNet(a)
+      bVal = getDisplayNet(b)
     } else if (salarySortCol === 'gross') {
-      aVal = toNumber(a.baseSalary ?? a.totalSalary)
-      bVal = toNumber(b.baseSalary ?? b.totalSalary)
+      aVal = getDisplayGross(a)
+      bVal = getDisplayGross(b)
     } else if (salarySortCol === 'days') {
       aVal = getDisplayDays(a)
       bVal = getDisplayDays(b)
@@ -178,6 +212,8 @@ export default function StaffPage() {
 
   const workingCount    = todayAdmins.filter(a => a.status === 'WORKING').length
   const notWorkingCount = todayAdmins.filter(a => a.status !== 'WORKING').length
+  const todayOvertimeHours = todayAdmins.reduce((sum, a) => sum + getAttendanceOvertimeHours(a), 0)
+  const todayOffOfficeHours = todayAdmins.reduce((sum, a) => sum + getAttendanceOffOfficeHours(a), 0)
 
   return (
     <div>
@@ -262,6 +298,8 @@ export default function StaffPage() {
                 )}
                 <span className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">{workingCount} Working</span>
                 <span className="bg-red-100 text-red-600 text-xs font-semibold px-3 py-1 rounded-full">{notWorkingCount} Off</span>
+                <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full">OT {todayOvertimeHours}h</span>
+                <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1 rounded-full">Off-Office {todayOffOfficeHours}h</span>
               </div>
 
               {todayAdmins.length === 0 ? (
@@ -282,6 +320,9 @@ export default function StaffPage() {
                         <span className={`text-xs font-medium ${a.status === 'WORKING' ? 'text-green-600' : 'text-red-500'}`}>
                           {a.status === 'WORKING' ? '✓ Working' : '✗ Day Off'}
                         </span>
+                        <p className="text-[11px] text-gray-500 mt-0.5">
+                          OT {getAttendanceOvertimeHours(a)}h · Off-Office {getAttendanceOffOfficeHours(a)}h
+                        </p>
                       </div>
                     </div>
                   ))}
@@ -307,6 +348,9 @@ export default function StaffPage() {
                             <span className="text-sm font-medium text-gray-700">{name}</span>
                             <span className="text-sm font-bold text-primary-700">{days} days</span>
                           </div>
+                          <p className="text-xs text-gray-500 mb-1">
+                            OT {toNumber(monthHoursByName[name]?.overtime)}h · Off-Office {toNumber(monthHoursByName[name]?.offOffice)}h
+                          </p>
                           <div className="h-1.5 bg-gray-100 rounded-full">
                             <div className="h-1.5 bg-primary-500 rounded-full" style={{ width:`${Math.min((days/26)*100,100)}%` }} />
                           </div>
@@ -333,7 +377,7 @@ export default function StaffPage() {
                       <p className="text-xs text-gray-500 mt-1">Staff</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-green-50 to-white border-green-100">
-                      <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s + toNumber(r.baseSalary ?? r.totalSalary), 0))}</p>
+                      <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s + getDisplayGross(r), 0))}</p>
                       <p className="text-xs text-gray-500 mt-1">Gross Salary</p>
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-red-50 to-white border-red-100">
@@ -344,7 +388,7 @@ export default function StaffPage() {
                     </div>
                     <div className="card text-center py-3 bg-gradient-to-br from-purple-50 to-white border-purple-100">
                       <p className="text-xl font-bold text-purple-700">
-                        {formatRs(adminSalaries.reduce((s,r) => s + toNumber(r.totalSalary), 0))}
+                        {formatRs(adminSalaries.reduce((s,r) => s + getDisplayNet(r), 0))}
                       </p>
                       <p className="text-xs text-gray-500 mt-1">Net Payable</p>
                     </div>
@@ -366,8 +410,8 @@ export default function StaffPage() {
                       <tbody>
                         {adminSalaries.map((s, i) => {
                           const owed   = getDisplayCredits(s)
-                          const gross  = toNumber(s.baseSalary ?? s.totalSalary)
-                          const net    = toNumber(s.totalSalary)
+                          const gross  = getDisplayGross(s)
+                          const net    = getDisplayNet(s)
                           const days   = getDisplayDays(s)
                           return (
                             <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
