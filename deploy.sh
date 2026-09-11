@@ -13,6 +13,7 @@ SERVER="sahan@74.208.132.78"
 REMOTE_DIR="/var/www/oss-dashboard"
 TMP_DIR="/home/sahan/oss-dashboard-deploy-tmp"
 LIVE_URL="https://www.onestopdaily.shop/"
+SSH_OPTS="-o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
 
 on_exit() {
     local status="$1"
@@ -44,6 +45,13 @@ done
 CURRENT_BRANCH="$(git rev-parse --abbrev-ref HEAD)"
 echo "🚀 Deploying branch: $CURRENT_BRANCH"
 
+echo "🔌 Checking SSH access..."
+if ! ssh $SSH_OPTS "$SERVER" "echo OK" >/dev/null 2>&1; then
+    echo "❌ Cannot connect/authenticate to $SERVER over SSH."
+    echo "   Run this first and fix login: ssh $SERVER"
+    exit 1
+fi
+
 echo "📦 Installing dependencies..."
 npm ci --prefer-offline
 
@@ -68,11 +76,11 @@ else
 fi
 
 echo "📡 Uploading build to VPS..."
-ssh "$SERVER" "mkdir -p '$TMP_DIR' && rm -rf '$TMP_DIR/dist'"
-scp -r dist "$SERVER:$TMP_DIR/"
+ssh $SSH_OPTS "$SERVER" "mkdir -p '$TMP_DIR' && rm -rf '$TMP_DIR/dist'"
+scp $SSH_OPTS -r dist "$SERVER:$TMP_DIR/"
 
 echo "🔧 Deploying on VPS..."
-ssh "$SERVER" "
+ssh $SSH_OPTS "$SERVER" "
     set -euo pipefail
     test -f '$TMP_DIR/dist/index.html'
     sudo mkdir -p '$REMOTE_DIR'
