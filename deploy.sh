@@ -14,6 +14,21 @@ REMOTE_DIR="/var/www/oss-dashboard"
 TMP_DIR="/home/sahan/oss-dashboard-deploy-tmp"
 LIVE_URL="https://www.onestopdaily.shop/"
 
+on_exit() {
+    local status="$1"
+    echo ""
+    if [ "$status" -eq 0 ]; then
+        echo "✅ Script finished successfully."
+    else
+        echo "❌ Script failed (exit code: $status)."
+    fi
+    if [ -t 0 ]; then
+        echo ""
+        read -r -p "Press Enter to close this window..."
+    fi
+}
+trap 'on_exit $?' EXIT
+
 if ! git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     echo "❌ Must run inside git repository"
     exit 1
@@ -76,9 +91,11 @@ for attempt in 1 2 3 4 5; do
         echo "🌐 $LIVE_URL"
         echo "🌿 Branch: $CURRENT_BRANCH"
         echo "📝 Commit: $(git rev-parse --short HEAD)"
-        exit 0
+        break
     fi
     sleep 3
 done
 
-echo "⚠️ Deploy finished, but smoke test did not confirm site response"
+if ! curl -sSf "$LIVE_URL" >/dev/null; then
+    echo "⚠️ Deploy finished, but smoke test did not confirm site response"
+fi
