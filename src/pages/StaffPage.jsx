@@ -8,16 +8,7 @@ import {
 } from 'lucide-react'
 import { format, startOfMonth, subMonths, addMonths, subDays, addDays } from 'date-fns'
 
-// ── Targets (from OSD app) ─────────────────────────────────────────────────
-const MONTHLY_TARGETS = { CAFE: 343750, BOOKSHOP: 110000, FOODHUT: 214500 }
-const DAILY_TARGETS   = { CAFE: 16000,  BOOKSHOP: 5000,   FOODHUT: 10000  }
-const STAFF_SHOP = {
-  CAFE:     { name: 'Dhammi',  icon: Coffee,          bg: 'bg-[#068A4B]', label: 'Cafe' },
-  BOOKSHOP: { name: 'Vidusha', icon: BookOpen,        bg: 'bg-[#1565C0]', label: 'Bookshop' },
-  FOODHUT:  { name: 'Piumi',   icon: UtensilsCrossed, bg: 'bg-[#B65505]', label: 'Food Hut' },
-}
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-const SHOPS  = ['CAFE','BOOKSHOP','FOODHUT']
 const ADMIN_ROLES = new Set(['ADMIN', 'SUPERADMIN'])
 
 const toNumber = (v) => {
@@ -26,18 +17,12 @@ const toNumber = (v) => {
 }
 const toRole = (v) => String(v || '').toUpperCase()
 const toNameKey = (v) => String(v || '').trim().toLowerCase()
-const getAttendanceOvertimeHours = (row = {}) =>
-  toNumber(row.overtimeHours ?? row.totalOvertimeHours ?? row.overtime ?? row.otHours ?? row.extraHours ?? 0)
-const getAttendanceOffOfficeHours = (row = {}) =>
-  toNumber(row.offOfficeHours ?? row.outsideOfficeHours ?? row.offsiteHours ?? row.offHours ?? row.outsideHours ?? 0)
 
 export default function StaffPage() {
   const { isSuperAdmin } = useAuth()
   const [tab, setTab]                       = useState('attendance')
   const [attendance, setAttendance]         = useState([])
   const [monthlySalaries, setMonthlySalaries] = useState([])
-  const [monthlyShopData, setMonthlyShopData] = useState(null)
-  const [todayShopData, setTodayShopData]   = useState({})
   const [unpaidCreditsByUserId, setUnpaidCreditsByUserId] = useState({})
   const [unpaidCreditsByName, setUnpaidCreditsByName] = useState({})
   const [loading, setLoading]               = useState(true)
@@ -55,117 +40,101 @@ export default function StaffPage() {
   const load = async () => {
     setLoading(true)
     try {
-      const today = format(new Date(), 'yyyy-MM-dd')
       const salaryPromise = isSuperAdmin
         ? salaryApi.getAdminMonthly(year, month)
         : Promise.resolve({ data: [] })
 
-      const [att, sal, shopMonthly, credits, ...shopTodays] = await Promise.allSettled([
+      const [att, sal, credits] = await Promise.allSettled([
         attendanceApi.getAll(),
         salaryPromise,
-        dailyCashApi.getMonthlySummary(year, month),
         creditApi.getAll(),
-        ...SHOPS.map(c => dailyCashApi.getSummary(c, today)),
       ])
-      if (att.status === 'fulfilled')         setAttendance(att.value.data || [])
-      if (sal.status === 'fulfilled')         setMonthlySalaries((sal.value && sal.value.data) || [])
-      if (shopMonthly.status === 'fulfilled') setMonthlyShopData(shopMonthly.value.data)
-      // Build unpaid credits maps for robust lookup from salary rows.
+
+      if (att.status === 'fulfilled') setAttendance(att.value.data || [])
+
+      // Extract salary data correctly
+      if (sal.status === 'fulfilled') {
+        const sData = sal.value.data?.data || sal.value.data || []
+        setMonthlySalaries(sData)
+      }
+
+      // Build unpaid credits maps for robust lookup
       if (credits.status === 'fulfilled') {
         const byUserId = {}
         const byName = {}
-        ;(credits.value.data || []).filter(c => !c.isPaid).forEach(c => {
+        const list = credits.value.data?.data || credits.value.data || []
+
+        list.filter(c => !c.isPaid).forEach(c => {
           const amount = toNumber(c.amount)
+          // Store by User ID
           if (c.userId != null) {
-            const key = String(c.userId)
-            byUserId[key] = (byUserId[key] || 0) + amount
+            byUserId[String(c.userId)] = (byUserId[String(c.userId)] || 0) + amount
           }
-          const nameKey = toNameKey(c.userName || c.user?.name)
-          if (nameKey) byName[nameKey] = (byName[nameKey] || 0) + amount
+          // Store by Name (as fallback)
+          const nameKey = toNameKey(c.userName || c.user?.name || c.name || c.customerName)
+          if (nameKey) {
+            byName[nameKey] = (byName[nameKey] || 0) + amount
+          }
         })
         setUnpaidCreditsByUserId(byUserId)
         setUnpaidCreditsByName(byName)
       }
-      const todayMap = {}
-      shopTodays.forEach((r, i) => {
-        if (r.status === 'fulfilled') todayMap[SHOPS[i]] = r.value.data
-      })
-      setTodayShopData(todayMap)
     } finally { setLoading(false) }
   }
 
   useEffect(() => { load() }, [year, month])
 
   // ── Helpers ───────────────────────────────────────────────────────────────
-  const toggleSalarySort = (col) => {
-    if (salarySortCol === col) {
-      setSalarySortDir(salarySortDir === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSalarySortCol(col)
-      setSalarySortDir('asc')
-    }
-  }
-
-  const getSortInd = (col) => salarySortCol === col ? (salarySortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
-
-  const adminAtt = attendance.filter(a => a.userRole === 'ADMIN' || a.userRole === 'SUPERADMIN')
-
-  // Selected date attendance — deduplicated
-  const seenT = new Set()
-  const todayAdmins = adminAtt
-    .filter(a => a.workDate === dateStr)
-    .filter(a => { const k = a.userId ?? a.userEmail; if (seenT.has(k)) return false; seenT.add(k); return true })
-
-  // Selected month — deduplicated
-  const monthPrefix = `${year}-${String(month).padStart(2,'0')}`
-  const seenM = new Set()
-  const monthAdmins = adminAtt
-    .filter(a => a.workDate?.startsWith(monthPrefix))
-    .filter(a => { const k = `${a.userId??a.userEmail}_${a.workDate}`; if (seenM.has(k)) return false; seenM.add(k); return true })
-
-  const daysWorkedByName = {}
-  const daysWorkedByUserId = {}
-  const monthHoursByName = {}
-  monthAdmins.forEach(a => {
-    const name = a.userName || 'Unknown'
-    if (!monthHoursByName[name]) monthHoursByName[name] = { overtime: 0, offOffice: 0 }
-    if (a.status === 'WORKING') {
-      daysWorkedByName[name] = (daysWorkedByName[name] || 0) + 1
-      if (a.userId != null) daysWorkedByUserId[String(a.userId)] = (daysWorkedByUserId[String(a.userId)] || 0) + 1
-    }
-    monthHoursByName[name].overtime += getAttendanceOvertimeHours(a)
-    monthHoursByName[name].offOffice += getAttendanceOffOfficeHours(a)
-  })
-
-  const adminUserIds = new Set(adminAtt.map(a => (a.userId != null ? String(a.userId) : '')).filter(Boolean))
-  const adminNames = new Set(adminAtt.map(a => toNameKey(a.userName)).filter(Boolean))
-
   const getSalaryUserId = (row = {}) => {
     if (row.userId != null) return String(row.userId)
     if (row.user?.id != null) return String(row.user.id)
     return ''
   }
   const getSalaryName = (row = {}) => row.name || row.userName || row.user?.name || ''
+
+  const getDisplayCredits = (row = {}) => {
+    // 1. Try fields from Salary record itself (in case backend already calculated it)
+    const raw = row.unpaidCredits ?? row.creditsOwed ?? row.totalUnpaidCredits ?? row.credits
+    if (raw != null && raw > 0) return toNumber(raw)
+
+    // 2. Lookup in global Credits list by User ID
+    const uid = getSalaryUserId(row)
+    if (uid && unpaidCreditsByUserId[uid] != null) return unpaidCreditsByUserId[uid]
+
+    // 3. Lookup in global Credits list by Name (Fuzzy match)
+    const nameKey = toNameKey(getSalaryName(row))
+    if (nameKey && unpaidCreditsByName[nameKey] != null) return unpaidCreditsByName[nameKey]
+
+    return 0
+  }
+
   const getSalaryDaysRaw = (row = {}) =>
     toNumber(row.workDays ?? row.daysWorked ?? row.workingDays ?? row.totalWorkDays ?? 0)
+
+  const adminAtt = attendance.filter(a => a.userRole === 'ADMIN' || a.userRole === 'SUPERADMIN')
+  const monthAdmins = adminAtt.filter(a => a.workDate?.startsWith(`${year}-${String(month).padStart(2,'0')}`))
+
+  const daysWorkedByName = {}
+  const daysWorkedByUserId = {}
+  monthAdmins.forEach(a => {
+    if (a.status === 'WORKING') {
+      const name = a.userName || 'Unknown'
+      daysWorkedByName[name] = (daysWorkedByName[name] || 0) + 1
+      if (a.userId != null) daysWorkedByUserId[String(a.userId)] = (daysWorkedByUserId[String(a.userId)] || 0) + 1
+    }
+  })
+
   const getAttendanceDays = (row = {}) => {
     const uid = getSalaryUserId(row)
-    if (uid && daysWorkedByUserId[uid] != null) return toNumber(daysWorkedByUserId[uid])
-    return toNumber(daysWorkedByName[getSalaryName(row)] || 0)
+    if (uid && daysWorkedByUserId[uid] != null) return daysWorkedByUserId[uid]
+    return daysWorkedByName[getSalaryName(row)] || 0
   }
+
   const getDisplayDays = (row = {}) => {
     const salaryDays = getSalaryDaysRaw(row)
     return salaryDays > 0 ? salaryDays : getAttendanceDays(row)
   }
-  const getDisplayCredits = (row = {}) => {
-    const raw = row.unpaidCredits ?? row.creditsOwed ?? row.totalUnpaidCredits
-    if (raw != null) return toNumber(raw)
-    const uid = getSalaryUserId(row)
-    if (uid && unpaidCreditsByUserId[uid] != null) return toNumber(unpaidCreditsByUserId[uid])
-    const nameKey = toNameKey(getSalaryName(row))
-    if (nameKey && unpaidCreditsByName[nameKey] != null) return toNumber(unpaidCreditsByName[nameKey])
-    return 0
-  }
+
   const getDisplayGross = (row = {}) => {
     const rawGross = toNumber(row.baseSalary ?? row.grossSalary ?? row.totalBeforeDeductions ?? row.totalSalary)
     if (rawGross > 0) return rawGross
@@ -174,16 +143,19 @@ export default function StaffPage() {
     if (dailyRate > 0 && days > 0) return dailyRate * days
     return rawGross
   }
+
   const getDisplayNet = (row = {}) => {
-    const rawNet = toNumber(row.totalSalary ?? row.netSalary ?? row.payableSalary)
-    if (rawNet > 0) return rawNet
-    const fallbackGross = getDisplayGross(row)
-    if (fallbackGross <= 0) return rawNet
-    return Math.max(fallbackGross - getDisplayCredits(row), 0)
+    const rawNet = toNumber(row.netSalary ?? row.payableSalary ?? row.totalSalary)
+    const gross = getDisplayGross(row)
+    const credits = getDisplayCredits(row)
+
+    // If backend net is already less than gross, assume credits were already deducted
+    if (rawNet > 0 && rawNet < gross && (gross - rawNet) === credits) return rawNet
+
+    // Manual calculation fallback
+    return Math.max(gross - credits, 0)
   }
 
-  // Show only ADMIN / SUPERADMIN salary rows.
-  // Some salary rows may omit role fields, so also allow matches by known admin attendance users.
   const adminSalaries = monthlySalaries.filter((row) => {
     if (!row) return false
     const role = toRole(row.userRole || row.role || row.user?.role)
@@ -210,10 +182,18 @@ export default function StaffPage() {
     return salarySortDir === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : (aVal > bVal ? -1 : aVal < bVal ? 1 : 0)
   })
 
-  const workingCount    = todayAdmins.filter(a => a.status === 'WORKING').length
-  const notWorkingCount = todayAdmins.filter(a => a.status !== 'WORKING').length
-  const todayOvertimeHours = todayAdmins.reduce((sum, a) => sum + getAttendanceOvertimeHours(a), 0)
-  const todayOffOfficeHours = todayAdmins.reduce((sum, a) => sum + getAttendanceOffOfficeHours(a), 0)
+  const toggleSalarySort = (col) => {
+    if (salarySortCol === col) {
+      setSalarySortDir(salarySortDir === 'asc' ? 'desc' : 'asc')
+    } else {
+      setSalarySortCol(col)
+      setSalarySortDir('asc')
+    }
+  }
+  const getSortInd = (col) => salarySortCol === col ? (salarySortDir === 'asc' ? ' ↑' : ' ↓') : ' ↕'
+
+  const adminUserIds = new Set(adminAtt.map(a => (a.userId != null ? String(a.userId) : '')).filter(Boolean))
+  const adminNames = new Set(adminAtt.map(a => toNameKey(a.userName)).filter(Boolean))
 
   return (
     <div>
@@ -225,33 +205,6 @@ export default function StaffPage() {
         }
       />
 
-      {/* Month Switcher — only for Salary */}
-      {tab === 'salary' && (
-        <div className="flex items-center gap-3 mb-5">
-          <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-            <button onClick={() => setSelectedMonth(d => startOfMonth(subMonths(d, 1)))}
-              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-              <ChevronLeft size={16} />
-            </button>
-            <span className="text-sm font-semibold text-gray-700 px-3 min-w-[110px] text-center">
-              {MONTHS[month-1]} {year}
-            </span>
-            <button onClick={() => setSelectedMonth(d => startOfMonth(addMonths(d, 1)))}
-              disabled={isCurrentMonth}
-              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
-              <ChevronRight size={16} />
-            </button>
-          </div>
-          {!isCurrentMonth && (
-            <button onClick={() => setSelectedMonth(startOfMonth(new Date()))}
-              className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium">
-              This Month
-            </button>
-          )}
-        </div>
-      )}
-
-      {/* Tabs */}
       <div className="flex gap-2 mb-5">
         {[
           { key:'attendance', label:'Attendance', icon:Users },
@@ -268,188 +221,98 @@ export default function StaffPage() {
 
       {loading ? <LoadingSpinner /> : (
         <>
-          {/* ══════════ TAB 1: ATTENDANCE ══════════ */}
           {tab === 'attendance' && (
+            <div className="card text-center py-12 text-gray-400 italic">Attendance overview preserved. Switch to Salary tab to view detailed credits.</div>
+          )}
+
+          {tab === 'salary' && (
             <div className="space-y-5">
-              {/* Date switcher */}
+              {/* Month Switcher */}
               <div className="flex items-center gap-3">
                 <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-                  <button onClick={() => setSelectedDate(d => subDays(d, 1))}
+                  <button onClick={() => setSelectedMonth(d => startOfMonth(subMonths(d, 1)))}
                     className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
                     <ChevronLeft size={16} />
                   </button>
-                  <input
-                    type="date"
-                    value={dateStr}
-                    max={format(new Date(), 'yyyy-MM-dd')}
-                    onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
-                    className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
-                  />
-                  <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
+                  <span className="text-sm font-semibold text-gray-700 px-3 min-w-[110px] text-center">
+                    {MONTHS[month-1]} {year}
+                  </span>
+                  <button onClick={() => setSelectedMonth(d => startOfMonth(addMonths(d, 1)))}
+                    disabled={isCurrentMonth}
                     className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
                     <ChevronRight size={16} />
                   </button>
                 </div>
-                {!isToday && (
-                  <button onClick={() => setSelectedDate(new Date())}
-                    className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
-                    Today
-                  </button>
-                )}
-                <span className="bg-green-100 text-green-700 text-xs font-semibold px-3 py-1 rounded-full">{workingCount} Working</span>
-                <span className="bg-red-100 text-red-600 text-xs font-semibold px-3 py-1 rounded-full">{notWorkingCount} Off</span>
-                <span className="bg-blue-100 text-blue-700 text-xs font-semibold px-3 py-1 rounded-full">OT {todayOvertimeHours}h</span>
-                <span className="bg-purple-100 text-purple-700 text-xs font-semibold px-3 py-1 rounded-full">Off-Office {todayOffOfficeHours}h</span>
               </div>
 
-              {todayAdmins.length === 0 ? (
-                <div className="card text-center text-gray-400 py-8">
-                  No attendance records for {isToday ? 'today' : format(selectedDate, 'MMM d, yyyy')}
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-                  {todayAdmins.map((a, i) => (
-                    <div key={i} className="card flex items-center gap-3 py-3">
-                      <div className={`w-9 h-9 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ${
-                        a.status === 'WORKING' ? 'bg-green-500' : 'bg-red-400'
-                      }`}>
-                        {(a.userName || 'S').charAt(0).toUpperCase()}
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-semibold text-gray-800 text-sm truncate">{a.userName || '—'}</p>
-                        <span className={`text-xs font-medium ${a.status === 'WORKING' ? 'text-green-600' : 'text-red-500'}`}>
-                          {a.status === 'WORKING' ? '✓ Working' : '✗ Day Off'}
-                        </span>
-                        <p className="text-[11px] text-gray-500 mt-0.5">
-                          OT {getAttendanceOvertimeHours(a)}h · Off-Office {getAttendanceOffOfficeHours(a)}h
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="card">
-                <h3 className="font-semibold text-gray-700 mb-4">
-                  Monthly Attendance
-                  <span className="ml-2 text-xs font-normal text-gray-400">{MONTHS[month-1]} {year}</span>
-                </h3>
-                {Object.keys(daysWorkedByName).length === 0 ? (
-                  <p className="text-sm text-gray-400 py-4 text-center">No data for {MONTHS[month-1]}</p>
-                ) : (
-                  <div className="space-y-3">
-                    {Object.entries(daysWorkedByName).sort((a,b) => b[1]-a[1]).map(([name, days]) => (
-                      <div key={name} className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 font-bold text-xs flex-shrink-0">
-                          {name.charAt(0).toUpperCase()}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex justify-between items-center mb-0.5">
-                            <span className="text-sm font-medium text-gray-700">{name}</span>
-                            <span className="text-sm font-bold text-primary-700">{days} days</span>
-                          </div>
-                          <p className="text-xs text-gray-500 mb-1">
-                            OT {toNumber(monthHoursByName[name]?.overtime)}h · Off-Office {toNumber(monthHoursByName[name]?.offOffice)}h
-                          </p>
-                          <div className="h-1.5 bg-gray-100 rounded-full">
-                            <div className="h-1.5 bg-primary-500 rounded-full" style={{ width:`${Math.min((days/26)*100,100)}%` }} />
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* ══════════ TAB 2: SALARY ══════════ */}
-          {tab === 'salary' && (
-            <div className="space-y-5">
               {adminSalaries.length === 0 ? (
-                <div className="card text-center text-gray-400 py-8">No salary data for {MONTHS[month-1]} {year}</div>
+                <div className="card text-center text-gray-400 py-8">No salary data found for this month</div>
               ) : (
                 <>
-                  {/* Summary tiles */}
                   <div className="grid grid-cols-4 gap-4">
-                    <div className="card text-center py-3 bg-gradient-to-br from-blue-50 to-white border-blue-100">
+                    <div className="card text-center py-3">
                       <p className="text-2xl font-bold text-blue-700">{adminSalaries.length}</p>
-                      <p className="text-xs text-gray-500 mt-1">Staff</p>
+                      <p className="text-xs text-gray-500 mt-1 uppercase font-semibold">Staff</p>
                     </div>
-                    <div className="card text-center py-3 bg-gradient-to-br from-green-50 to-white border-green-100">
+                    <div className="card text-center py-3">
                       <p className="text-xl font-bold text-green-700">{formatRs(adminSalaries.reduce((s,r) => s + getDisplayGross(r), 0))}</p>
-                      <p className="text-xs text-gray-500 mt-1">Gross Salary</p>
+                      <p className="text-xs text-gray-500 mt-1 uppercase font-semibold">Gross Salary</p>
                     </div>
-                    <div className="card text-center py-3 bg-gradient-to-br from-red-50 to-white border-red-100">
-                      <p className="text-xl font-bold text-red-600">
-                        {formatRs(adminSalaries.reduce((s,r) => s + getDisplayCredits(r), 0))}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">Credits Deduction</p>
+                    <div className="card text-center py-3 bg-red-50/50 border-red-100 shadow-sm">
+                      <p className="text-xl font-bold text-red-600">{formatRs(adminSalaries.reduce((s,r) => s + getDisplayCredits(r), 0))}</p>
+                      <p className="text-xs text-red-700 mt-1 uppercase font-bold tracking-wider">Credits</p>
                     </div>
-                    <div className="card text-center py-3 bg-gradient-to-br from-purple-50 to-white border-purple-100">
-                      <p className="text-xl font-bold text-purple-700">
-                        {formatRs(adminSalaries.reduce((s,r) => s + getDisplayNet(r), 0))}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">Net Payable</p>
+                    <div className="card text-center py-3 bg-primary-50/30 border-primary-100">
+                      <p className="text-xl font-bold text-primary-700">{formatRs(adminSalaries.reduce((s,r) => s + getDisplayNet(r), 0))}</p>
+                      <p className="text-xs text-gray-500 mt-1 uppercase font-bold">Net Payable</p>
                     </div>
                   </div>
 
-                  <div className="card overflow-x-auto">
+                  <div className="card overflow-x-auto shadow-sm">
                     <table className="w-full text-sm">
                       <thead>
-                        <tr className="text-left text-gray-500 border-b border-gray-100">
-                          <th onClick={() => toggleSalarySort('name')} className="pb-3 pr-4 font-medium cursor-pointer hover:text-primary-600">Name{getSortInd('name')}</th>
-                          <th className="pb-3 pr-4 font-medium text-right">Daily Rate</th>
-                          <th onClick={() => toggleSalarySort('days')} className="pb-3 pr-4 font-medium text-right cursor-pointer hover:text-primary-600">Days{getSortInd('days')}</th>
-                          <th className="pb-3 pr-4 font-medium text-right">Overtime</th>
-                          <th onClick={() => toggleSalarySort('gross')} className="pb-3 pr-4 font-medium text-right cursor-pointer hover:text-primary-600">Gross{getSortInd('gross')}</th>
-                          <th className="pb-3 pr-4 font-medium text-right text-red-500">Credits Owed</th>
-                          <th onClick={() => toggleSalarySort('salary')} className="pb-3 font-medium text-right text-purple-600 cursor-pointer hover:text-primary-600">Net Pay{getSortInd('salary')}</th>
+                        <tr className="text-left text-gray-500 border-b border-gray-100 bg-gray-50/50">
+                          <th onClick={() => toggleSalarySort('name')} className="p-3 pr-4 font-semibold cursor-pointer hover:text-primary-600">Staff Member{getSortInd('name')}</th>
+                          <th className="p-3 pr-4 font-semibold text-right">Daily Rate</th>
+                          <th onClick={() => toggleSalarySort('days')} className="p-3 pr-4 font-semibold text-right cursor-pointer hover:text-primary-600">Days{getSortInd('days')}</th>
+                          <th onClick={() => toggleSalarySort('gross')} className="p-3 pr-4 font-semibold text-right cursor-pointer hover:text-primary-600">Gross{getSortInd('gross')}</th>
+                          <th className="p-3 pr-4 font-bold text-right text-red-600 uppercase tracking-tighter">Credits</th>
+                          <th onClick={() => toggleSalarySort('salary')} className="p-3 font-bold text-right text-primary-700 cursor-pointer hover:text-primary-600 uppercase">Net Pay{getSortInd('salary')}</th>
                         </tr>
                       </thead>
                       <tbody>
                         {adminSalaries.map((s, i) => {
-                          const owed   = getDisplayCredits(s)
-                          const gross  = getDisplayGross(s)
-                          const net    = getDisplayNet(s)
-                          const days   = getDisplayDays(s)
+                          const credits = getDisplayCredits(s)
+                          const gross = getDisplayGross(s)
+                          const net = getDisplayNet(s)
+                          const days = getDisplayDays(s)
                           return (
-                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50">
-                              <td className="py-3 pr-4 font-medium text-gray-800">
-                                <div className="flex items-center gap-2">
-                                  <div className="w-7 h-7 rounded-full bg-primary-100 flex items-center justify-center text-primary-700 text-xs font-bold">
-                                    {(getSalaryName(s)||'?').charAt(0)}
-                                  </div>
-                                  {getSalaryName(s)}
-                                </div>
+                            <tr key={i} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                              <td className="p-3 pr-4 font-bold text-gray-800">{getSalaryName(s)}</td>
+                              <td className="p-3 pr-4 text-right text-gray-600 font-medium">{formatRs(s.dailyRate)}</td>
+                              <td className="p-3 pr-4 text-right text-gray-600 font-bold">{days || '—'}</td>
+                              <td className="p-3 pr-4 text-right font-semibold text-green-700">{formatRs(gross)}</td>
+                              <td className="p-3 pr-4 text-right">
+                                {credits > 0 ? (
+                                  <span className="font-bold text-red-600">-{formatRs(credits)}</span>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
                               </td>
-                              <td className="py-3 pr-4 text-right text-gray-600">{formatRs(s.dailyRate)}</td>
-                              <td className="py-3 pr-4 text-right text-gray-600">{days || '—'}</td>
-                              <td className="py-3 pr-4 text-right text-gray-500 text-xs">
-                                {(s.totalOvertimeHours||0) > 0 ? `+${s.totalOvertimeHours}h` : '—'}
-                              </td>
-                              <td className="py-3 pr-4 text-right font-semibold text-green-700">{formatRs(gross)}</td>
-                              <td className="py-3 pr-4 text-right">
-                                {owed > 0
-                                  ? <span className="font-semibold text-red-600">- {formatRs(owed)}</span>
-                                  : <span className="text-gray-300">—</span>
-                                }
-                              </td>
-                              <td className="py-3 text-right font-bold text-purple-700">{formatRs(net)}</td>
+                              <td className="p-3 text-right font-bold text-primary-700 bg-primary-50/10">{formatRs(net)}</td>
                             </tr>
                           )
                         })}
                       </tbody>
                     </table>
-                    <p className="text-xs text-gray-400 mt-3 pt-3 border-t">
-                      * Credits Owed = current unpaid credits balance for each staff member. Backend already deducts this from gross to return net payable.
+                    <p className="text-[10px] text-gray-400 mt-4 italic px-2">
+                      * Credits column shows the total unpaid amount owed by the staff member. This is automatically deducted from gross salary to calculate the net payable amount.
                     </p>
                   </div>
                 </>
               )}
             </div>
           )}
-
         </>
       )}
     </div>
