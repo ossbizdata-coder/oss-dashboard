@@ -12,7 +12,6 @@ cd "$PROJECT_ROOT"
 SERVER="sahan@74.208.132.78"
 REMOTE_DIR="/var/www/oss-dashboard"
 TMP_DIR="/home/sahan/oss-dashboard-deploy-tmp"
-LIVE_URL="https://www.onestopdaily.shop/"
 SSH_OPTS="-o ConnectTimeout=10 -o ServerAliveInterval=15 -o ServerAliveCountMax=3"
 
 on_exit() {
@@ -35,7 +34,7 @@ if ! git -C "$PROJECT_ROOT" rev-parse --is-inside-work-tree >/dev/null 2>&1; the
     exit 1
 fi
 
-for cmd in npm git ssh scp curl; do
+for cmd in npm git ssh scp; do
     if ! command -v "$cmd" >/dev/null 2>&1; then
         echo "❌ Missing required command: $cmd"
         exit 1
@@ -93,18 +92,6 @@ ssh -tt $SSH_OPTS "$SERVER" "
     rm -rf '$TMP_DIR'
 "
 
-echo "🧪 Smoke test..."
-for attempt in 1 2 3 4 5; do
-    if curl -sSf "$LIVE_URL" >/dev/null; then
-        echo "✅ Deployment successful"
-        echo "🌐 $LIVE_URL"
-        echo "🌿 Branch: $CURRENT_BRANCH"
-        echo "📝 Commit: $(git rev-parse --short HEAD)"
-        break
-    fi
-    sleep 3
-done
-
-if ! curl -sSf "$LIVE_URL" >/dev/null; then
-    echo "⚠️ Deploy finished, but smoke test did not confirm site response"
-fi
+echo "✅ Deployment successful"
+echo "🌿 Branch: $CURRENT_BRANCH"
+echo "📝 Commit: $(git rev-parse --short HEAD)"

@@ -9,7 +9,7 @@ import { attendanceApi, dailyCashApi } from '../services/api.js'
 import { StatCard, PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
 import useBusinessSettings from '../hooks/useBusinessSettings.js'
-import { calculateCalculatedSales, calculateConfiguredProfit, calculateRevenue } from '../utils/businessSettings.js'
+import { calculateCalculatedSales, calculateConfiguredProfit } from '../utils/businessSettings.js'
 
 const SHOPS = ['CAFE', 'BOOKSHOP', 'FOODHUT']
 const SHOP_CARDS = [
@@ -73,7 +73,6 @@ export default function DashboardPage() {
   useEffect(() => { load() }, [dateStr])
 
   const calcSales = (summary) => calculateCalculatedSales(summary)
-  const calcRevenue = (summary) => calculateRevenue(summary)
   const calcProfit = (shopCode) => calculateConfiguredProfit(shopCode, calcSales(shopSummaries[shopCode]), businessSettings)
 
   const totalSales = SHOPS.reduce((sum, shopCode) => sum + calcSales(shopSummaries[shopCode]), 0)
@@ -145,7 +144,7 @@ export default function DashboardPage() {
       {loading ? <LoadingSpinner size="lg" /> : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard title="Revenue" value={formatRs(totalSales)} icon={TrendingUp} color="green" subtitle="All shops combined" />
+            <StatCard title="Sales" value={formatRs(totalSales)} icon={TrendingUp} color="green" subtitle="All shops combined" />
             <StatCard title="Expenses" value={formatRs(totalExpenses)} icon={TrendingDown} color="red" subtitle="All shops combined" />
             <StatCard title="Profit" value={formatRs(totalProfit)} icon={DollarSign} color="blue" subtitle="Using settings profit rates" />
             <StatCard title="Credits" value={formatRs(totalDailyCredits)} icon={CreditCard} color="orange" subtitle="Credits given this day" />
@@ -161,13 +160,6 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {SHOP_CARDS.map(({ code, label, icon: Icon, border, text, bg }) => {
               const summary = shopSummaries[code] || {}
-              const metrics = [
-                { label: 'Total Revenue', value: calcRevenue(summary), valueClass: 'text-green-700' },
-                { label: 'Total Expenses', value: summary.totalExpenses || 0, valueClass: 'text-red-600' },
-                { label: 'Total Credits', value: summary.totalCredits || 0, valueClass: 'text-amber-600' },
-                { label: 'Calculated Sales', value: calcSales(summary), valueClass: 'text-primary-700' },
-                { label: 'Calculated Profit', value: calcProfit(code), valueClass: 'text-blue-700' },
-              ]
 
               return (
                 <Link key={code} to={`/shops/${code}`} className={`card hover:shadow-md transition-shadow border-l-4 ${border} group`}>
@@ -179,13 +171,37 @@ export default function DashboardPage() {
                     <span className="ml-auto text-xs text-gray-400 group-hover:text-primary-600 transition-colors">View →</span>
                   </div>
 
-                  <div className="space-y-3">
-                    {metrics.map((metric) => (
-                      <div key={metric.label} className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">{metric.label}</span>
-                        <span className={`font-bold ${metric.valueClass}`}>{formatRs(metric.value)}</span>
+                  <div className="space-y-3 text-sm">
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="rounded-xl bg-gray-50 px-3 py-2">
+                        <p className="text-gray-500 text-xs">Opening</p>
+                        <p className="font-bold text-gray-800 mt-1">{formatRs(summary.openingBalance)}</p>
                       </div>
-                    ))}
+                      <div className="rounded-xl bg-gray-50 px-3 py-2">
+                        <p className="text-gray-500 text-xs">Closing</p>
+                        <p className="font-bold text-gray-800 mt-1">{formatRs(summary.closingBalance)}</p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-3">
+                      <div className="rounded-xl bg-green-50 px-3 py-2">
+                        <p className="text-gray-500 text-xs">Sales</p>
+                        <p className="font-bold text-green-700 mt-1">{formatRs(calcSales(summary))}</p>
+                      </div>
+                      <div className="rounded-xl bg-red-50 px-3 py-2">
+                        <p className="text-gray-500 text-xs">Expenses</p>
+                        <p className="font-bold text-red-600 mt-1">{formatRs(summary.totalExpenses)}</p>
+                      </div>
+                      <div className="rounded-xl bg-amber-50 px-3 py-2">
+                        <p className="text-gray-500 text-xs">Credits</p>
+                        <p className="font-bold text-amber-600 mt-1">{formatRs(summary.totalCredits)}</p>
+                      </div>
+                    </div>
+
+                    <div className="rounded-xl bg-blue-50 px-3 py-3">
+                      <p className="text-gray-500 text-xs">Profit</p>
+                      <p className="font-bold text-blue-700 text-lg mt-1">{formatRs(calcProfit(code))}</p>
+                    </div>
                   </div>
                 </Link>
               )
