@@ -4,178 +4,110 @@ import {
   Coffee, BookOpen, UtensilsCrossed, RefreshCw,
   ChevronLeft, ChevronRight, Calendar
 } from 'lucide-react'
-import { dailyCashApi, salaryApi, transactionApi } from '../services/api.js'
+import { dailyCashApi, salaryApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { format, subMonths, addMonths, startOfMonth } from 'date-fns'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
+import useBusinessSettings from '../hooks/useBusinessSettings.js'
+import { calculateConfiguredProfit, getTotalFixedMonthlyExpenses, toNumber } from '../utils/businessSettings.js'
 
 const SHOP_META = {
-  CAFE:     { label: 'Cafe',     icon: Coffee,          bg: 'bg-[#068A4B]' },
-  BOOKSHOP: { label: 'Bookshop', icon: BookOpen,        bg: 'bg-[#1565C0]' },
-  FOODHUT:  { label: 'Food Hut', icon: UtensilsCrossed, bg: 'bg-[#B65505]' },
+  CAFE: { label: 'Cafe', icon: Coffee, bg: 'bg-[#068A4B]' },
+  BOOKSHOP: { label: 'Bookshop', icon: BookOpen, bg: 'bg-[#1565C0]' },
+  FOODHUT: { label: 'Food Hut', icon: UtensilsCrossed, bg: 'bg-[#B65505]' },
 }
 
-const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-const toNum = (v) => Number(v || 0)
-const shopProfit = (shop = {}) => (shop.profit != null ? toNum(shop.profit) : (toNum(shop.totalSales) - toNum(shop.totalExpenses)))
-const overallProfit = (summary = {}) => {
-  const overall = summary?.overall || {}
-  if (overall.totalProfit != null) return toNum(overall.totalProfit)
-  const shops = summary?.shops || []
-  return shops.reduce((sum, s) => sum + shopProfit(s), 0)
-}
-const overallRevenue = (summary = {}) => {
-  const shops = summary?.shops || []
-  const tracked = shops.filter(s => SHOP_META[s.shopCode])
-  if (tracked.length) return tracked.reduce((sum, s) => sum + toNum(s.totalSales), 0)
-  return toNum(summary?.overall?.totalSales)
-}
+const getTrackedShops = (summary = {}) => (summary.shops || []).filter((shop) => SHOP_META[shop.shopCode])
 
-const monthRange = (year, month) => {
-  const mm = String(month).padStart(2, '0')
-  const start = `${year}-${mm}-01`
-  const last = new Date(year, month, 0).getDate()
-  const end = `${year}-${mm}-${String(last).padStart(2, '0')}`
-  return { start, end }
-}
-
-const isZeroMonthlySummary = (summary) => {
-  const shops = summary?.shops || []
-  if (!shops.length) return true
-  const tracked = shops.filter(s => SHOP_META[s.shopCode])
-  if (!tracked.length) return true
-  return tracked.every(s =>
-    toNum(s.totalSales) === 0 &&
-    toNum(s.totalExpenses) === 0 &&
-    toNum(s.profit ?? 0) === 0
-  )
-}
-
-async function getMonthlySummaryWithFallback(year, month) {
-  try {
-    const primary = (await dailyCashApi.getMonthlySummary(year, month)).data
-    if (!isZeroMonthlySummary(primary)) return primary
-  } catch (_) {
-    // fallback below
-  }
-
-  const { start, end } = monthRange(year, month)
-  const depts = ['CAFE', 'BOOKSHOP', 'FOODHUT']
-  const res = await Promise.allSettled(
-    depts.map((d) => transactionApi.getDepartmentSummaryRange(d, start, end))
-  )
-
-  const shops = res.map((r, i) => {
-    const code = depts[i]
-    const body = r.status === 'fulfilled' ? (r.value.data || {}) : {}
-    const totalSales = toNum(body.calculatedSales)
-    const totalExpenses = toNum(body.totalExpenses)
-    const totalCredits = toNum(body.totalCredits)
-    const profit = body.profit != null ? toNum(body.profit) : (totalSales - totalExpenses)
-    return {
-      shopCode: code,
-      shopName: SHOP_META[code].label,
-      totalSales,
-      totalExpenses,
-      totalCredits,
-      profit,
-      profitMargin: toNum(body.profitMargin),
-      profitPercentage: toNum(body.profitPercentage),
-      daysRecorded: 0,
-    }
-  })
-
-  return {
-    year,
-    month,
-    shops,
-    overall: {
-      totalSales: shops.reduce((s, x) => s + toNum(x.totalSales), 0),
-      totalExpenses: shops.reduce((s, x) => s + toNum(x.totalExpenses), 0),
-      totalCredits: shops.reduce((s, x) => s + toNum(x.totalCredits), 0),
-      totalProfit: shops.reduce((s, x) => s + toNum(x.profit), 0),
-    },
-  }
-}
+const getMonthlyRevenue = (summary = {}) => getTrackedShops(summary).reduce((sum, shop) => sum + toNumber(shop.totalSales), 0)
 
 export default function MonthlyPage() {
   const { isSuperAdmin } = useAuth()
+  const [businessSettings] = useBusinessSettings()
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()))
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [monthlySalary, setMonthlySalary] = useState(0)
-  const [ytd, setYtd] = useState({ sales: 0, expenses: 0, salary: 0, gross: 0, net: 0 })
+  const [ytd, setYtd] = useState({ sales: 0, expenses: 0, salary: 0, fixed: 0, gross: 0, net: 0 })
 
-  const year  = selectedMonth.getFullYear()
-  const month = selectedMonth.getMonth() + 1 // 1-based
+  const year = selectedMonth.getFullYear()
+  const month = selectedMonth.getMonth() + 1
   const isCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth() + 1
+
+  const getShopProfit = (shopCode, totalSales) => calculateConfiguredProfit(shopCode, totalSales, businessSettings)
+
+  const getOverallProfit = (summary = {}) => getTrackedShops(summary).reduce(
+    (sum, shop) => sum + getShopProfit(shop.shopCode, shop.totalSales),
+    0
+  )
 
   const load = async () => {
     setLoading(true)
     try {
       const [monthSummaryRes, monthSalaryRes] = await Promise.allSettled([
-        getMonthlySummaryWithFallback(year, month),
+        dailyCashApi.getMonthlySummary(year, month),
         salaryApi.getAdminMonthly(year, month),
       ])
 
-      // Monthly summary
-      let monthSummary = null
-      if (monthSummaryRes.status === 'fulfilled') {
-        monthSummary = monthSummaryRes.value
-      }
+      const monthSummary = monthSummaryRes.status === 'fulfilled' ? (monthSummaryRes.value.data || null) : null
       setData(monthSummary)
 
-      // Monthly staff salary
       let monthSalaryTotal = 0
       if (monthSalaryRes.status === 'fulfilled') {
         const rows = monthSalaryRes.value.data || []
-        monthSalaryTotal = rows.reduce((s, r) => s + (r.totalSalary || 0), 0)
+        monthSalaryTotal = rows.reduce((sum, row) => sum + toNumber(row.totalSalary), 0)
       }
       setMonthlySalary(monthSalaryTotal)
 
-      // YTD rollup (Jan -> selected month)
       let ytdSales = 0
       let ytdExpenses = 0
-      let ytdProfit = 0
+      let ytdGross = 0
       let ytdSalary = 0
 
-      for (let m = 1; m <= month; m++) {
-        const [mSummaryRes, mSalaryRes] = await Promise.allSettled([
-          getMonthlySummaryWithFallback(year, m),
-          salaryApi.getAdminMonthly(year, m),
+      for (let currentMonth = 1; currentMonth <= month; currentMonth += 1) {
+        const [summaryRes, salaryRes] = await Promise.allSettled([
+          dailyCashApi.getMonthlySummary(year, currentMonth),
+          salaryApi.getAdminMonthly(year, currentMonth),
         ])
 
-        if (mSummaryRes.status === 'fulfilled') {
-          const summary = mSummaryRes.value || {}
-          const overall = summary.overall || {}
-          ytdSales += overallRevenue(summary)
-          ytdExpenses += overall.totalExpenses || 0
-          ytdProfit += overallProfit(summary)
+        if (summaryRes.status === 'fulfilled') {
+          const summary = summaryRes.value.data || {}
+          ytdSales += getMonthlyRevenue(summary)
+          ytdExpenses += toNumber(summary?.overall?.totalExpenses)
+          ytdGross += getOverallProfit(summary)
         }
 
-        if (mSalaryRes.status === 'fulfilled') {
-          const rows = mSalaryRes.value.data || []
-          ytdSalary += rows.reduce((s, r) => s + (r.totalSalary || 0), 0)
+        if (salaryRes.status === 'fulfilled') {
+          const rows = salaryRes.value.data || []
+          ytdSalary += rows.reduce((sum, row) => sum + toNumber(row.totalSalary), 0)
         }
       }
 
-      const ytdGross = ytdProfit
-      const ytdNet = ytdGross - ytdSalary
-      setYtd({ sales: ytdSales, expenses: ytdExpenses, salary: ytdSalary, gross: ytdGross, net: ytdNet })
-    } catch (e) {
+      const monthlyFixedExpenses = getTotalFixedMonthlyExpenses(businessSettings)
+      const ytdFixedExpenses = monthlyFixedExpenses * month
+      setYtd({
+        sales: ytdSales,
+        expenses: ytdExpenses,
+        salary: ytdSalary,
+        fixed: ytdFixedExpenses,
+        gross: ytdGross,
+        net: ytdGross - ytdSalary - ytdFixedExpenses,
+      })
+    } catch (_) {
       setData(null)
       setMonthlySalary(0)
-      setYtd({ sales: 0, expenses: 0, salary: 0, gross: 0, net: 0 })
+      setYtd({ sales: 0, expenses: 0, salary: 0, fixed: 0, gross: 0, net: 0 })
     } finally {
       setLoading(false)
     }
   }
 
-  useEffect(() => { load() }, [year, month])
+  useEffect(() => { load() }, [year, month, businessSettings])
 
   if (!isSuperAdmin) {
     return (
@@ -186,23 +118,21 @@ export default function MonthlyPage() {
     )
   }
 
-  // Helpers
-  const shopData = (shopCode) =>
-    data?.shops?.find(s => s.shopCode === shopCode) || {}
-
+  const shopData = (shopCode) => data?.shops?.find((shop) => shop.shopCode === shopCode) || {}
   const overall = data?.overall || {}
-  const monthlyRevenue = overallRevenue(data)
-  const monthlyGrossProfit = overallProfit(data)
-  const monthlyNetProfit = monthlyGrossProfit - monthlySalary
+  const monthlyRevenue = getMonthlyRevenue(data || {})
+  const monthlyGrossProfit = getOverallProfit(data || {})
+  const monthlyFixedExpenses = getTotalFixedMonthlyExpenses(businessSettings)
+  const monthlyNetProfit = monthlyGrossProfit - monthlySalary - monthlyFixedExpenses
 
-  const chartData = Object.keys(SHOP_META).map(code => {
-    const s = shopData(code)
+  const chartData = Object.keys(SHOP_META).map((shopCode) => {
+    const shop = shopData(shopCode)
     return {
-      name: SHOP_META[code].label,
-      Sales:    Math.round(s.totalSales    || 0),
-      Expenses: Math.round(s.totalExpenses || 0),
-      Credits:  Math.round(s.totalCredits  || 0),
-      Profit:   Math.round(shopProfit(s)),
+      name: SHOP_META[shopCode].label,
+      Sales: Math.round(toNumber(shop.totalSales)),
+      Expenses: Math.round(toNumber(shop.totalExpenses)),
+      Credits: Math.round(toNumber(shop.totalCredits)),
+      Profit: Math.round(getShopProfit(shopCode, shop.totalSales)),
     }
   })
 
@@ -210,24 +140,23 @@ export default function MonthlyPage() {
     <div>
       <PageHeader
         title="Monthly Summary"
-        action={
+        action={(
           <button onClick={load} className="btn-outline flex items-center gap-2 text-sm">
             <RefreshCw size={15} /> Refresh
           </button>
-        }
+        )}
       />
 
-      {/* ── Month Switcher ── */}
       <div className="flex items-center gap-3 mb-6">
         <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-          <button onClick={() => setSelectedMonth(d => startOfMonth(subMonths(d, 1)))}
+          <button onClick={() => setSelectedMonth((date) => startOfMonth(subMonths(date, 1)))}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
             <ChevronLeft size={16} />
           </button>
           <span className="text-sm font-semibold text-gray-700 px-3 min-w-[110px] text-center">
             {MONTHS[month - 1]} {year}
           </span>
-          <button onClick={() => setSelectedMonth(d => startOfMonth(addMonths(d, 1)))}
+          <button onClick={() => setSelectedMonth((date) => startOfMonth(addMonths(date, 1)))}
             disabled={isCurrentMonth}
             className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
             <ChevronRight size={16} />
@@ -245,7 +174,6 @@ export default function MonthlyPage() {
         </span>
       </div>
 
-      {/* ── Compact YTD Strip (Business Summary aligned) ── */}
       {!loading && (
         <div className="card mb-6 border border-primary-100">
           <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -255,6 +183,8 @@ export default function MonthlyPage() {
             <span className="font-semibold text-blue-700">Gross Profit: {formatRs(ytd.gross)}</span>
             <span className="text-gray-400">•</span>
             <span className="font-semibold text-orange-700">Staff Salary: {formatRs(ytd.salary)}</span>
+            <span className="text-gray-400">•</span>
+            <span className="font-semibold text-purple-700">Fixed Expenses: {formatRs(ytd.fixed)}</span>
             <span className="text-gray-400">•</span>
             <span className={`font-bold ${ytd.net >= 0 ? 'text-green-700' : 'text-red-600'}`}>
               Net Profit: {formatRs(ytd.net)}
@@ -267,7 +197,6 @@ export default function MonthlyPage() {
         <div className="card text-center text-gray-400 py-12">No data available for this month</div>
       ) : (
         <>
-          {/* ── Overall KPIs ── */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
             <div className="card bg-gradient-to-br from-green-50 to-white border border-green-100">
               <div className="flex items-center gap-2 mb-1">
@@ -275,7 +204,7 @@ export default function MonthlyPage() {
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</span>
               </div>
               <p className="text-2xl font-bold text-green-700">{formatRs(monthlyRevenue)}</p>
-              <p className="text-xs text-gray-400 mt-1">All shops · {MONTHS[month-1]} {year}</p>
+              <p className="text-xs text-gray-400 mt-1">All shops · {MONTHS[month - 1]} {year}</p>
             </div>
             <div className="card bg-gradient-to-br from-red-50 to-white border border-red-100">
               <div className="flex items-center gap-2 mb-1">
@@ -283,7 +212,7 @@ export default function MonthlyPage() {
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Expenses</span>
               </div>
               <p className="text-2xl font-bold text-red-600">{formatRs(overall.totalExpenses)}</p>
-              <p className="text-xs text-gray-400 mt-1">All shops · {MONTHS[month-1]} {year}</p>
+              <p className="text-xs text-gray-400 mt-1">All shops · {MONTHS[month - 1]} {year}</p>
             </div>
             <div className="card bg-gradient-to-br from-blue-50 to-white border border-blue-100">
               <div className="flex items-center gap-2 mb-1">
@@ -291,7 +220,7 @@ export default function MonthlyPage() {
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gross Profit</span>
               </div>
               <p className="text-2xl font-bold text-blue-700">{formatRs(monthlyGrossProfit)}</p>
-              <p className="text-xs text-gray-400 mt-1">Sales x shop profit ratio</p>
+              <p className="text-xs text-gray-400 mt-1">Using configured shop profit rates</p>
             </div>
             <div className="card bg-gradient-to-br from-amber-50 to-white border border-amber-100">
               <div className="flex items-center gap-2 mb-1">
@@ -301,43 +230,42 @@ export default function MonthlyPage() {
               <p className={`text-2xl font-bold ${monthlyNetProfit >= 0 ? 'text-amber-700' : 'text-red-600'}`}>
                 {formatRs(monthlyNetProfit)}
               </p>
-              <p className="text-xs text-gray-400 mt-1">Gross - Staff Salary ({formatRs(monthlySalary)})</p>
+              <p className="text-xs text-gray-400 mt-1">Gross - Staff Salary - Fixed Expenses</p>
             </div>
           </div>
 
-          {/* ── Per-Shop Breakdown ── */}
           <h2 className="text-base font-semibold text-gray-700 mb-3">Shop Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            {Object.entries(SHOP_META).map(([code, { label, icon: Icon, bg }]) => {
-              const s = shopData(code)
-              const est = shopProfit(s)
+            {Object.entries(SHOP_META).map(([shopCode, { label, icon: Icon, bg }]) => {
+              const shop = shopData(shopCode)
+              const shopProfit = getShopProfit(shopCode, shop.totalSales)
               return (
-                <div key={code} className="card">
+                <div key={shopCode} className="card">
                   <div className="flex items-center gap-3 mb-4">
                     <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center`}>
                       <Icon size={20} className="text-white" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-gray-800">{label}</h3>
-                      <p className="text-xs text-gray-400">{s.daysRecorded ?? 0} days recorded</p>
+                      <p className="text-xs text-gray-400">{shop.daysRecorded ?? 0} days recorded</p>
                     </div>
                   </div>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
                       <span className="text-gray-500">Revenue</span>
-                      <span className="font-bold text-green-700">{formatRs(s.totalSales)}</span>
+                      <span className="font-bold text-green-700">{formatRs(shop.totalSales)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Expenses</span>
-                      <span className="font-bold text-red-500">{formatRs(s.totalExpenses)}</span>
+                      <span className="font-bold text-red-500">{formatRs(shop.totalExpenses)}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-gray-500">Credits</span>
-                      <span className="font-bold text-amber-600">{formatRs(s.totalCredits)}</span>
+                      <span className="font-bold text-amber-600">{formatRs(shop.totalCredits)}</span>
                     </div>
                     <div className="flex justify-between border-t pt-2">
                       <span className="text-gray-500">Gross Profit</span>
-                      <span className="font-bold text-blue-700">{formatRs(est)}</span>
+                      <span className="font-bold text-blue-700">{formatRs(shopProfit)}</span>
                     </div>
                   </div>
                 </div>
@@ -345,31 +273,27 @@ export default function MonthlyPage() {
             })}
           </div>
 
-          {/* ── Chart ── */}
           <div className="card">
             <h2 className="text-base font-semibold text-gray-800 mb-4">
-              Monthly Comparison — {MONTHS[month-1]} {year}
+              Monthly Comparison — {MONTHS[month - 1]} {year}
             </h2>
             <ResponsiveContainer width="100%" height={280}>
               <BarChart data={chartData} margin={{ top: 0, right: 10, left: 0, bottom: 0 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
                 <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 11 }} width={65} tickFormatter={v => `Rs ${(v/1000).toFixed(0)}k`} />
-                <Tooltip formatter={(v) => formatRs(v)} />
+                <YAxis tick={{ fontSize: 11 }} width={65} tickFormatter={(value) => `${(value / 1000).toFixed(0)}k`} />
+                <Tooltip formatter={(value) => formatRs(value)} />
                 <Legend />
-                <Bar dataKey="Sales"    fill="#1565C0" radius={[4,4,0,0]} />
-                <Bar dataKey="Expenses" fill="#ef4444" radius={[4,4,0,0]} />
-                <Bar dataKey="Credits"  fill="#f59e0b" radius={[4,4,0,0]} />
-                <Bar dataKey="Profit"   fill="#22c55e" radius={[4,4,0,0]} />
+                <Bar dataKey="Sales" fill="#1565C0" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Expenses" fill="#ef4444" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Credits" fill="#f59e0b" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="Profit" fill="#22c55e" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
 
-          {/* ── Note ── */}
           <p className="text-xs text-gray-400 mt-4 text-center">
-            ⚠️ Only <strong>closed days</strong> are included in monthly totals.
-            Open/incomplete days appear when the day is closed in the app.
-            Gross profit uses shop ratios (Cafe 12%, Bookshop 15%, Food Hut 20%). Net profit = Gross profit - Staff salary.
+            Only closed days are included. Gross profit uses Settings profit rates, and net profit subtracts staff salary plus fixed monthly expenses.
           </p>
         </>
       )}

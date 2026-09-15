@@ -1,8 +1,8 @@
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
-  LayoutDashboard, Store, Users, CreditCard, UtensilsCrossed,
-  BarChart3, Shield, Settings, LogOut, ChevronRight, Menu, X, CalendarDays, UserCog, Receipt
+  LayoutDashboard, Store, Users, CreditCard,
+  BarChart3, Shield, Settings, LogOut, Menu, CalendarDays, Receipt
 } from 'lucide-react'
 import { useState } from 'react'
 import clsx from 'clsx'
@@ -14,10 +14,8 @@ const navItems = [
   { to: '/staff', label: 'Staff & HR', icon: Users },
   { to: '/credits',  label: 'Credits',    icon: CreditCard },
   { to: '/expenses', label: 'Expenses',   icon: Receipt },
-  { to: '/foodhut',  label: 'Food Hut',   icon: UtensilsCrossed },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
   { to: '/audit-logs', label: 'Audit Logs', icon: Shield, superAdminOnly: true },
-  { to: '/users',      label: 'User Management', icon: UserCog, superAdminOnly: true },
   { to: '/settings',   label: 'Settings', icon: Settings, superAdminOnly: true },
 ]
 
@@ -126,4 +124,3 @@ export default function Layout() {
     </div>
   )
 }
-

@@ -4,6 +4,8 @@ import { PageHeader, formatRs } from '../components/ui.jsx'
 import { useEffect, useState } from 'react'
 import { dailyCashApi } from '../services/api.js'
 import { format, subDays, addDays } from 'date-fns'
+import useBusinessSettings from '../hooks/useBusinessSettings.js'
+import { calculateCalculatedSales, calculateConfiguredProfit } from '../utils/businessSettings.js'
 
 const SHOPS = [
   { code: 'CAFE', label: 'Cafe', icon: Coffee, color: '#068A4B', bg: 'bg-[#068A4B]', lightBg: 'bg-green-50' },
@@ -15,6 +17,7 @@ export default function ShopsPage() {
   const [summaries, setSummaries] = useState({})
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
+  const [businessSettings] = useBusinessSettings()
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd')
@@ -34,9 +37,6 @@ export default function ShopsPage() {
               calculatedSales: d.totalSales,
               totalExpenses:   d.totalExpenses,
               totalCredits:    d.totalCredits,
-              profit: d.totalSales != null
-                ? d.totalSales * ({ CAFE: 0.12, BOOKSHOP: 0.15, FOODHUT: 0.20 }[s.code] || 0.10)
-                : 0,
               locked: d.locked,
             }
           }
@@ -85,6 +85,7 @@ export default function ShopsPage() {
       <div className="grid grid-cols-1 gap-6">
         {SHOPS.map(({ code, label, icon: Icon, bg, lightBg, color }) => {
           const s = summaries[code] || {}
+          const profit = calculateConfiguredProfit(code, calculateCalculatedSales(s), businessSettings)
           return (
             <div key={code} className="card">
               <div className="flex items-center gap-4 mb-6">
@@ -111,7 +112,7 @@ export default function ShopsPage() {
                   { label: 'Sales', value: formatRs(s.calculatedSales), color: 'text-green-700' },
                   { label: 'Expenses', value: formatRs(s.totalExpenses), color: 'text-red-600' },
                   { label: 'Credits', value: formatRs(s.totalCredits), color: 'text-orange-600' },
-                  { label: 'Profit', value: formatRs(s.profit), color: 'text-blue-700 font-bold' },
+                  { label: 'Profit', value: formatRs(profit), color: 'text-blue-700 font-bold' },
                 ].map(({ label: l, value, color: c }) => (
                   <div key={l} className={`${lightBg} rounded-xl p-3`}>
                     <p className="text-xs text-gray-500">{l}</p>
@@ -126,4 +127,3 @@ export default function ShopsPage() {
     </div>
   )
 }
-

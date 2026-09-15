@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { userApi } from '../services/api.js'
-import { PageHeader, LoadingSpinner } from '../components/ui.jsx'
+import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { Users, Pencil, Trash2, RefreshCw, X, Check, ShieldAlert } from 'lucide-react'
 
@@ -141,8 +141,8 @@ export default function UsersPage() {
                       {u.role}
                     </span>
                   </td>
-                  <td className="py-3 pr-4 text-right text-gray-600">Rs {u.dailySalary?.toFixed(0) ?? '—'}</td>
-                  <td className="py-3 pr-4 text-right text-gray-600">Rs {u.hourlyRate?.toFixed(0) ?? '—'}</td>
+                  <td className="py-3 pr-4 text-right text-gray-600">{u.dailySalary != null ? formatRs(u.dailySalary) : '—'}</td>
+                  <td className="py-3 pr-4 text-right text-gray-600">{u.hourlyRate != null ? formatRs(u.hourlyRate) : '—'}</td>
                   <td className="py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
                       <button
@@ -232,7 +232,7 @@ export default function UsersPage() {
               {/* Daily Salary + Hourly Rate */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Daily Salary (Rs)</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Daily Salary</label>
                   <input
                     type="number"
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
@@ -241,7 +241,7 @@ export default function UsersPage() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-500 mb-1">Hourly Rate (Rs)</label>
+                  <label className="block text-xs font-medium text-gray-500 mb-1">Hourly Rate</label>
                   <input
                     type="number"
                     className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-400"
@@ -282,4 +282,3 @@ export default function UsersPage() {
     </div>
   )
 }
-

@@ -96,6 +96,5 @@ export function EmptyState({ icon: Icon, title, description }) {
 }
 
 export function formatRs(amount) {
-  return `Rs ${Number(amount || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 })}`
+  return Number(amount || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 })
 }
-

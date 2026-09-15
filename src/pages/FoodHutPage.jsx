@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { foodhutApi } from '../services/api.js'
-import { PageHeader, LoadingSpinner, EmptyState } from '../components/ui.jsx'
+import { PageHeader, LoadingSpinner, EmptyState, formatRs } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { ChevronLeft, ChevronRight, UtensilsCrossed, Pencil, Trash2, Check, X } from 'lucide-react'
 import { format, subDays, addDays } from 'date-fns'
@@ -115,17 +115,17 @@ export default function FoodHutPage() {
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="card text-center border-l-4 border-[#21C36F]">
           <p className="text-xs text-gray-500 font-medium">PREPARED</p>
-          <p className="text-2xl font-bold text-[#21C36F] mt-1">Rs {preparedTotal.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-[#21C36F] mt-1">{formatRs(preparedTotal)}</p>
           <p className="text-xs text-gray-400">{prepared.length} rows</p>
         </div>
         <div className="card text-center border-l-4 border-blue-500">
           <p className="text-xs text-gray-500 font-medium">SOLD</p>
-          <p className="text-2xl font-bold text-blue-600 mt-1">Rs {soldTotal.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-blue-600 mt-1">{formatRs(soldTotal)}</p>
           <p className="text-xs text-gray-400">Prepared − Remaining</p>
         </div>
         <div className="card text-center border-l-4 border-orange-500">
           <p className="text-xs text-gray-500 font-medium">REMAINING</p>
-          <p className="text-2xl font-bold text-orange-600 mt-1">Rs {remainingTotal.toLocaleString()}</p>
+          <p className="text-2xl font-bold text-orange-600 mt-1">{formatRs(remainingTotal)}</p>
           <p className="text-xs text-gray-400">{remaining.length} rows</p>
         </div>
       </div>
@@ -199,7 +199,7 @@ export default function FoodHutPage() {
                   <p className="font-medium text-sm text-gray-800">{item.name}</p>
                   {item.variations?.map((v, vi) => (
                     <p key={vi} className="text-xs text-gray-500 mt-0.5">
-                      {v.variation} — Rs {v.price}
+                      {v.variation} — {formatRs(v.price)}
                     </p>
                   ))}
                 </div>
@@ -255,7 +255,7 @@ function SaleRow({
           <div className="flex items-center gap-1">
             <div className="text-right">
               <p className={`text-sm font-bold ${color}`}>{qty ?? 0}×</p>
-              <p className="text-xs text-gray-400">Rs {sale.price}</p>
+              <p className="text-xs text-gray-400">{formatRs(sale.price)}</p>
             </div>
             {/* Edit / Delete icons — SuperAdmin only, visible on hover */}
             {isSuperAdmin && (

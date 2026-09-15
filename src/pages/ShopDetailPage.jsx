@@ -6,6 +6,8 @@ import { PageHeader, LoadingSpinner, formatRs, EmptyState, Badge } from '../comp
 import { format, subDays, addDays } from 'date-fns'
 import { formatSLShort } from '../utils/timezone.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
+import useBusinessSettings from '../hooks/useBusinessSettings.js'
+import { calculateCalculatedSales, calculateConfiguredProfit } from '../utils/businessSettings.js'
 
 const SHOP_META = {
   CAFE: { label: 'Cafe', color: '#068A4B', bg: 'bg-[#068A4B]' },
@@ -17,6 +19,7 @@ export default function ShopDetailPage() {
   const { shopCode } = useParams()
   const { isSuperAdmin } = useAuth()
   const meta = SHOP_META[shopCode?.toUpperCase()] || { label: shopCode, color: '#666', bg: 'bg-gray-500' }
+  const [businessSettings] = useBusinessSettings()
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [summary, setSummary] = useState(null)
   const [dailyCashId, setDailyCashId] = useState(null)
@@ -54,7 +57,6 @@ export default function ShopDetailPage() {
             calculatedSales: d.totalSales,
             // include explicit expenses array from dailyCash summary so UI can reuse Expenses module data
             expenses: d.expenses || [],
-            profit: d.totalSales != null ? d.totalSales * ({ CAFE: 0.12, BOOKSHOP: 0.15, FOODHUT: 0.20 }[shopCode?.toUpperCase()] || 0.10) : 0,
           }
         }),
         // pass department id (or fallback to shopCode) — some backends expect numeric id
@@ -118,6 +120,8 @@ export default function ShopDetailPage() {
   }
 
   useEffect(() => { load() }, [shopCode, selectedDate])
+
+  const calculatedProfit = calculateConfiguredProfit(shopCode?.toUpperCase(), calculateCalculatedSales(summary), businessSettings)
 
   const markCreditPaid = async (id) => {
     setMarkingPaid(id)
@@ -187,7 +191,7 @@ export default function ShopDetailPage() {
                 { lbl: 'Calculated Sales', val: summary.calculatedSales, c: 'text-green-700 font-bold', field: null },
                 { lbl: 'Total Expenses', val: summary.totalExpenses, c: 'text-red-600', field: null },
                 { lbl: 'Credits', val: summary.totalCredits, c: 'text-orange-600', field: null },
-                { lbl: 'Profit', val: summary.profit, c: 'text-blue-700 font-bold', field: null },
+                { lbl: 'Profit', val: calculatedProfit, c: 'text-blue-700 font-bold', field: null },
               ].map(({ lbl, val, c, field }) => (
                 <div key={lbl} className="card py-4 relative group">
                   <p className="text-xs text-gray-500">{lbl}

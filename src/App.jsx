@@ -12,7 +12,6 @@ import ReportsPage from './pages/ReportsPage.jsx'
 import AuditLogsPage from './pages/AuditLogsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import MonthlyPage from './pages/MonthlyPage.jsx'
-import UsersPage from './pages/UsersPage.jsx'
 import ExpensesPage from './pages/ExpensesPage.jsx'
 
 function PrivateRoute({ children }) {
@@ -64,7 +63,6 @@ export default function App() {
             <Route path="monthly" element={<SuperAdminRoute><MonthlyPage /></SuperAdminRoute>} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
             <Route path="settings" element={<SettingsPage />} />
-            <Route path="users" element={<UsersPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
@@ -72,4 +70,3 @@ export default function App() {
     </AuthProvider>
   )
 }
-

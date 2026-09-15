@@ -106,6 +106,11 @@ export const auditApi = {
   filter: (params) => api.get('/audit-logs/filter', { params }),
 }
 
+// ── REPORTS ─────────────────────────────────────────────────────────────────
+export const reportApi = {
+  getMonthlyExpenseItems: (year, month) => api.get(`/reports/expenses/monthly-items/${year}/${month}`),
+}
+
 // ── EXPENSE TYPES ──────────────────────────────────────────────────────────
 export const expenseTypeApi = {
   getAll: (shopType) => api.get('/expenses/types', { params: shopType ? { shopType } : undefined }),
