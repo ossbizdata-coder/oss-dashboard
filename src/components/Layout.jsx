@@ -9,7 +9,7 @@ import clsx from 'clsx'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { to: '/shops', label: 'Shops', icon: Store },
+  { to: '/shops', label: 'Departments', icon: Store },
   { to: '/monthly', label: 'Monthly Summary', icon: CalendarDays, superAdminOnly: true },
   { to: '/staff', label: 'Staff & HR', icon: Users },
   { to: '/credits',  label: 'Credits',    icon: CreditCard },

@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react'
 import {
   TrendingUp, TrendingDown, DollarSign, CreditCard,
   Coffee, BookOpen, UtensilsCrossed, RefreshCw,
-  ChevronLeft, ChevronRight, Calendar
+  ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { dailyCashApi, salaryApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import { format, subMonths, addMonths, startOfMonth } from 'date-fns'
+import { subMonths, addMonths, startOfMonth } from 'date-fns'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
@@ -33,6 +33,7 @@ export default function MonthlyPage() {
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [monthlySalary, setMonthlySalary] = useState(0)
+  const [monthlyWorkingDays, setMonthlyWorkingDays] = useState(0)
   const [ytd, setYtd] = useState({ sales: 0, expenses: 0, salary: 0, fixed: 0, gross: 0, net: 0 })
 
   const year = selectedMonth.getFullYear()
@@ -58,11 +59,16 @@ export default function MonthlyPage() {
       setData(monthSummary)
 
       let monthSalaryTotal = 0
+      let monthWorkingDays = 0
       if (monthSalaryRes.status === 'fulfilled') {
         const rows = monthSalaryRes.value.data || []
         monthSalaryTotal = rows.reduce((sum, row) => sum + toNumber(row.totalSalary), 0)
+        monthWorkingDays = rows.reduce((sum, row) => sum + toNumber(
+          row.workDays ?? row.daysWorked ?? row.workingDays ?? row.totalWorkDays ?? row.days
+        ), 0)
       }
       setMonthlySalary(monthSalaryTotal)
+      setMonthlyWorkingDays(monthWorkingDays)
 
       let ytdSales = 0
       let ytdExpenses = 0
@@ -101,6 +107,7 @@ export default function MonthlyPage() {
     } catch (_) {
       setData(null)
       setMonthlySalary(0)
+      setMonthlyWorkingDays(0)
       setYtd({ sales: 0, expenses: 0, salary: 0, fixed: 0, gross: 0, net: 0 })
     } finally {
       setLoading(false)
@@ -141,38 +148,37 @@ export default function MonthlyPage() {
       <PageHeader
         title="Monthly Summary"
         action={(
-          <button onClick={load} className="btn-outline flex items-center gap-2 text-sm">
-            <RefreshCw size={15} /> Refresh
-          </button>
+          <>
+            <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
+              <button onClick={() => setSelectedMonth((date) => startOfMonth(subMonths(date, 1)))}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              <span className="text-sm font-semibold text-gray-700 px-3 min-w-[110px] text-center">
+                {MONTHS[month - 1]} {year}
+              </span>
+              <button onClick={() => setSelectedMonth((date) => startOfMonth(addMonths(date, 1)))}
+                disabled={isCurrentMonth}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            <div className="rounded-2xl bg-primary-50 border border-primary-100 px-3 py-2">
+              <p className="text-[11px] font-bold uppercase tracking-wide text-primary-700">No of Working Days</p>
+              <p className="text-sm font-semibold text-primary-900 mt-0.5">{monthlyWorkingDays}</p>
+            </div>
+            {!isCurrentMonth && (
+              <button onClick={() => setSelectedMonth(startOfMonth(new Date()))}
+                className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
+                This Month
+              </button>
+            )}
+            <button onClick={load} className="btn-outline flex items-center gap-2 text-sm">
+              <RefreshCw size={15} /> Refresh
+            </button>
+          </>
         )}
       />
-
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-          <button onClick={() => setSelectedMonth((date) => startOfMonth(subMonths(date, 1)))}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <span className="text-sm font-semibold text-gray-700 px-3 min-w-[110px] text-center">
-            {MONTHS[month - 1]} {year}
-          </span>
-          <button onClick={() => setSelectedMonth((date) => startOfMonth(addMonths(date, 1)))}
-            disabled={isCurrentMonth}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        {!isCurrentMonth && (
-          <button onClick={() => setSelectedMonth(startOfMonth(new Date()))}
-            className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
-            This Month
-          </button>
-        )}
-        <span className="flex items-center gap-1 text-sm text-gray-500">
-          <Calendar size={14} />
-          {isCurrentMonth ? 'Current Month (partial)' : format(selectedMonth, 'MMMM yyyy')}
-        </span>
-      </div>
 
       {!loading && (
         <div className="card mb-6 border border-primary-100">
@@ -234,7 +240,7 @@ export default function MonthlyPage() {
             </div>
           </div>
 
-          <h2 className="text-base font-semibold text-gray-700 mb-3">Shop Breakdown</h2>
+          <h2 className="text-base font-semibold text-gray-700 mb-3">Department Breakdown</h2>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {Object.entries(SHOP_META).map(([shopCode, { label, icon: Icon, bg }]) => {
               const shop = shopData(shopCode)

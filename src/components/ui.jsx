@@ -38,12 +38,12 @@ export function StatCard({ title, value, subtitle, icon: Icon, color = 'blue', t
 
 export function PageHeader({ title, subtitle, action }) {
   return (
-    <div className="flex items-start justify-between mb-6">
+    <div className="mb-6 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
         {subtitle && <p className="text-gray-500 text-sm mt-1">{subtitle}</p>}
       </div>
-      {action && <div>{action}</div>}
+      {action && <div className="flex flex-wrap items-center gap-3">{action}</div>}
     </div>
   )
 }

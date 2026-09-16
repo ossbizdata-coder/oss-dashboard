@@ -112,20 +112,21 @@ export default function StaffPage() {
   return (
     <div className="pb-10">
       <PageHeader title="Staff & HR" subtitle="Attendance and Payroll"
-        action={<button onClick={load} className="btn-outline flex items-center gap-2 text-sm"><RefreshCw size={14}/> Refresh</button>}
+        action={(
+          <>
+            <div className="flex items-center bg-white border rounded-2xl px-2 py-1.5 shadow-sm">
+              <button onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))} className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronLeft size={16}/></button>
+              <span className="text-sm font-bold px-4 min-w-[120px] text-center">{MONTHS[month-1]} {year}</span>
+              <button onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))} disabled={isCurrentMonth} className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-30"><ChevronRight size={16}/></button>
+            </div>
+            <button onClick={load} className="btn-outline flex items-center gap-2 text-sm"><RefreshCw size={14}/> Refresh</button>
+          </>
+        )}
       />
 
       <div className="flex gap-2 mb-6">
         <button onClick={() => setTab('attendance')} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === 'attendance' ? 'bg-primary-700 text-white shadow-sm' : 'bg-white border text-gray-600 hover:bg-gray-50'}`}>Attendance</button>
         {isSuperAdmin && <button onClick={() => setTab('salary')} className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === 'salary' ? 'bg-primary-700 text-white shadow-sm' : 'bg-white border text-gray-600 hover:bg-gray-50'}`}>Salary</button>}
-      </div>
-
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center bg-white border rounded-2xl px-2 py-1.5 shadow-sm">
-          <button onClick={() => setSelectedMonth(subMonths(selectedMonth, 1))} className="p-1.5 hover:bg-gray-100 rounded-lg"><ChevronLeft size={16}/></button>
-          <span className="text-sm font-bold px-4 min-w-[120px] text-center">{MONTHS[month-1]} {year}</span>
-          <button onClick={() => setSelectedMonth(addMonths(selectedMonth, 1))} disabled={isCurrentMonth} className="p-1.5 hover:bg-gray-100 rounded-lg disabled:opacity-30"><ChevronRight size={16}/></button>
-        </div>
       </div>
 
       {loading ? <LoadingSpinner /> : (

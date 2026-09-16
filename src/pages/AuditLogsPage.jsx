@@ -90,42 +90,37 @@ export default function AuditLogsPage() {
       <PageHeader
         title="Audit Logs"
         subtitle="Full system activity trail — all times in Sri Lanka Time (SLT, UTC+5:30)"
-        action={
-          <button onClick={load} className="btn-outline flex items-center gap-2 text-sm">
-            <RefreshCw size={14} /> Refresh
-          </button>
-        }
-      />
-
-      {/* Date Switcher */}
-      <div className="flex items-center gap-3 mb-4">
-        <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1">
-          <button onClick={() => setSelectedDate(d => subDays(d, 1))}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <input
-            type="date"
-            value={dateStr}
-            max={todayStr()}
-            onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
-            className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
-          />
-          <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        {!isToday && (
-          <button onClick={() => setSelectedDate(new Date())}
-            className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
-            Today
-          </button>
+        action={(
+          <>
+            <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1">
+              <button onClick={() => setSelectedDate(d => subDays(d, 1))}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              <input
+                type="date"
+                value={dateStr}
+                max={todayStr()}
+                onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
+                className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
+              />
+              <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            {!isToday && (
+              <button onClick={() => setSelectedDate(new Date())}
+                className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
+                Today
+              </button>
+            )}
+            <button onClick={load} className="btn-outline flex items-center gap-2 text-sm">
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </>
         )}
-        <span className="text-xs text-gray-400 ml-1">
-          {format(selectedDate, 'EEEE, MMMM d, yyyy')}
-        </span>
-      </div>
+      />
 
       {/* Filters */}
       <div className="card mb-4 py-3 px-4 flex flex-wrap items-center gap-3">
@@ -268,4 +263,3 @@ export default function AuditLogsPage() {
     </div>
   )
 }
-

@@ -153,22 +153,27 @@ export default function ReportsPage() {
 
   return (
     <div className="pb-10">
-      <PageHeader title="Monthly Reports" subtitle="Business performance analytics" />
+      <PageHeader
+        title="Monthly Reports"
+        subtitle="Business performance analytics"
+        action={(
+          <div className="flex items-center gap-3">
+            <button onClick={() => setSelectedMonth(new Date(year, month - 2, 1))} className="p-2 hover:bg-gray-100 rounded-lg">←</button>
+            <input
+              type="month"
+              value={`${year}-${String(month).padStart(2, '0')}`}
+              onChange={(event) => {
+                const [selectedYear, selectedMonthValue] = event.target.value.split('-')
+                setSelectedMonth(new Date(selectedYear, selectedMonthValue - 1, 1))
+              }}
+              className="px-3 py-2 border rounded-xl text-sm font-bold"
+            />
+            <button onClick={() => setSelectedMonth(new Date(year, month, 1))} className="p-2 hover:bg-gray-100 rounded-lg">→</button>
+          </div>
+        )}
+      />
 
-      <div className="card mb-6 flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <button onClick={() => setSelectedMonth(new Date(year, month - 2, 1))} className="p-2 hover:bg-gray-100 rounded-lg">←</button>
-          <input
-            type="month"
-            value={`${year}-${String(month).padStart(2, '0')}`}
-            onChange={(event) => {
-              const [selectedYear, selectedMonthValue] = event.target.value.split('-')
-              setSelectedMonth(new Date(selectedYear, selectedMonthValue - 1, 1))
-            }}
-            className="px-3 py-2 border rounded-xl text-sm font-bold"
-          />
-          <button onClick={() => setSelectedMonth(new Date(year, month, 1))} className="p-2 hover:bg-gray-100 rounded-lg">→</button>
-        </div>
+      <div className="card mb-6 flex flex-wrap items-center justify-end gap-4">
         <div className="flex flex-wrap gap-2">
           {['monthly', 'expense', 'items', 'credit', 'profit']
             .filter((key) => key !== 'profit' || isSuperAdmin)
@@ -220,7 +225,7 @@ export default function ReportsPage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="bg-gray-50 text-gray-500 border-b">
-                      <th className="p-3 text-left">Shop</th>
+                      <th className="p-3 text-left">Department</th>
                       <th className="p-3 text-right">Revenue</th>
                       <th className="p-3 text-right">Credits</th>
                       <th className="p-3 text-right text-green-700">Calculated Sales</th>
@@ -260,7 +265,7 @@ export default function ReportsPage() {
                   </ResponsiveContainer>
                 </div>
                 <div className="card h-[350px]">
-                  <h3 className="font-bold mb-4">Profit by Shop</h3>
+                  <h3 className="font-bold mb-4">Profit by Department</h3>
                   <ResponsiveContainer>
                     <BarChart data={shopData}>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} />

@@ -52,35 +52,37 @@ export default function ShopsPage() {
 
   return (
     <div>
-      <PageHeader title="Shop Operations" subtitle="Daily performance across all 3 shops" />
-
-      {/* Date Navigator */}
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-          <button onClick={() => setSelectedDate(d => subDays(d, 1))}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <input
-            type="date"
-            value={dateStr}
-            max={format(new Date(), 'yyyy-MM-dd')}
-            onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
-            className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
-          />
-          <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        {!isToday && (
-          <button onClick={() => setSelectedDate(new Date())}
-            className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
-            Today
-          </button>
+      <PageHeader
+        title="Departments"
+        subtitle="Daily performance by department"
+        action={(
+          <>
+            <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
+              <button onClick={() => setSelectedDate(d => subDays(d, 1))}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              <input
+                type="date"
+                value={dateStr}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                onChange={e => e.target.value && setSelectedDate(new Date(e.target.value + 'T00:00:00'))}
+                className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
+              />
+              <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
+                <ChevronRight size={16} />
+              </button>
+            </div>
+            {!isToday && (
+              <button onClick={() => setSelectedDate(new Date())}
+                className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
+                Today
+              </button>
+            )}
+          </>
         )}
-        <span className="text-xs text-gray-400">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
-      </div>
+      />
 
       <div className="grid grid-cols-1 gap-6">
         {SHOPS.map(({ code, label, icon: Icon, bg, lightBg, color }) => {
@@ -94,7 +96,7 @@ export default function ShopsPage() {
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl font-bold text-gray-900">{label}</h2>
-                  <p className="text-sm text-gray-500">Shop Code: {code}</p>
+                  <p className="text-sm text-gray-500">Department Code: {code}</p>
                 </div>
                 <Link
                   to={`/shops/${code}`}

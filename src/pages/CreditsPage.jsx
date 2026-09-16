@@ -72,6 +72,8 @@ export default function CreditsPage() {
 
   const uniqueUsers = [...new Set(credits.map(c => c.userName).filter(Boolean))].sort()
 
+  const totalCreditsAmount = credits.reduce((sum, c) => sum + (c.amount || 0), 0)
+  const totalPaidAmount = credits.filter((c) => c.isPaid).reduce((sum, c) => sum + (c.amount || 0), 0)
   const filteredTotal = filtered.reduce((sum, c) => sum + (c.amount || 0), 0)
   const isFiltered = filter !== 'all' || shopFilter !== 'all' || userFilter !== 'all'
 
@@ -94,22 +96,18 @@ export default function CreditsPage() {
       />
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-        <div className="card text-center py-4">
-          <p className="text-2xl font-bold text-red-600">{formatRs(unpaidTotal)}</p>
-          <p className="text-sm text-gray-500 mt-1">Total Unpaid</p>
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+        <div className="card text-center py-4 border-t-4 border-primary-500">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Total Credits</p>
+          <p className="text-3xl font-bold text-primary-700 mt-2">{formatRs(totalCreditsAmount)}</p>
         </div>
-        <div className="card text-center py-4">
-          <p className="text-2xl font-bold text-gray-700">{credits.filter(c => !c.isPaid).length}</p>
-          <p className="text-sm text-gray-500 mt-1">Open Credits</p>
+        <div className="card text-center py-4 border-t-4 border-red-500">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Total Unpaid</p>
+          <p className="text-3xl font-bold text-red-600 mt-2">{formatRs(unpaidTotal)}</p>
         </div>
-        <div className="card text-center py-4">
-          <p className="text-2xl font-bold text-green-600">{credits.filter(c => c.isPaid).length}</p>
-          <p className="text-sm text-gray-500 mt-1">Paid Credits</p>
-        </div>
-        <div className="card text-center py-4">
-          <p className="text-2xl font-bold text-primary-700">{credits.length}</p>
-          <p className="text-sm text-gray-500 mt-1">Total Records</p>
+        <div className="card text-center py-4 border-t-4 border-green-500">
+          <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Total Paid</p>
+          <p className="text-3xl font-bold text-green-600 mt-2">{formatRs(totalPaidAmount)}</p>
         </div>
       </div>
 
@@ -129,9 +127,9 @@ export default function CreditsPage() {
             </button>
           ))}
         </div>
-        {/* Shop filter + Customer dropdown on same row */}
+        {/* Department filter + Customer dropdown on same row */}
         <div className="flex gap-2 flex-wrap items-center">
-          {[['all','All Shops'],['CAFE','Cafe'],['BOOKSHOP','Bookshop'],['FOODHUT','Food Hut'],['COMMON','Common']].map(([val, label]) => (
+          {[['all','All Departments'],['CAFE','Cafe'],['BOOKSHOP','Bookshop'],['FOODHUT','Food Hut'],['COMMON','Common']].map(([val, label]) => (
             <button
               key={val}
               onClick={() => setShopFilter(val)}
@@ -174,7 +172,7 @@ export default function CreditsPage() {
               {credits.length > 0 && filter !== 'all' && (
                 <button onClick={() => setFilter('all')}
                   className="mt-3 text-sm text-primary-600 hover:underline">
-                  Show all {credits.length} credits
+                  Show all credits
                 </button>
               )}
             </div>

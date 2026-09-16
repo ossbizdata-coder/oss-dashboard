@@ -109,7 +109,8 @@ export default function ExpensesPage() {
     ? monthlyExpenses.filter((expense) => expense.expenseTypeId === monthlyExpenseTypeId)
     : monthlyExpenses
 
-  const monthlyTotal = filteredMonthlyExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
+  const monthlyTotal = monthlyExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
+  const filteredMonthlyTotal = filteredMonthlyExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
 
   const monthlyShopTotals = SHOPS.map((shop) => ({
     ...shop,
@@ -169,36 +170,57 @@ export default function ExpensesPage() {
         title="Expenses"
         subtitle="Monthly and daily expenses across all shops"
         action={(
-          <button onClick={refreshAll} className="btn-outline flex items-center gap-2 text-sm">
-            <RefreshCw size={14} /> Refresh
-          </button>
-        )}
-      />
-
-      <div className="card mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div>
-            <h2 className="font-semibold text-gray-800">Monthly Expenses</h2>
-            <p className="text-sm text-gray-500 mt-1">Overall expenses for the selected month with expense-type filtering.</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
+          <>
+            <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
+              <button onClick={() => setSelectedDate(d => subDays(d, 1))}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+                <ChevronLeft size={16} />
+              </button>
+              <input
+                type="date"
+                value={dateStr}
+                max={format(new Date(), 'yyyy-MM-dd')}
+                onChange={event => event.target.value && setSelectedDate(new Date(event.target.value + 'T00:00:00'))}
+                className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
+              />
+              <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
+                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
+                <ChevronRight size={16} />
+              </button>
+            </div>
             <input
               type="month"
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
               className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-primary-400"
             />
-            <select
-              value={monthlyExpenseTypeId || ''}
-              onChange={(event) => setMonthlyExpenseTypeId(event.target.value ? parseInt(event.target.value) : null)}
-              className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-primary-400"
-            >
-              <option value="">All Expense Types</option>
-              {sortedExpenseTypes.map((type) => (
-                <option key={type.id} value={type.id}>{sanitizeDisplayText(type.name)}</option>
-              ))}
-            </select>
+            <button onClick={() => setSelectedDate(new Date())}
+              className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
+              Today
+            </button>
+            <button onClick={refreshAll} className="btn-outline flex items-center gap-2 text-sm">
+              <RefreshCw size={14} /> Refresh
+            </button>
+          </>
+        )}
+      />
+      
+      <div className="card mb-6">
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+          <div>
+            <h2 className="font-semibold text-gray-800">Monthly Expenses</h2>
+            <p className="text-sm text-gray-500 mt-1">Overall expenses for the selected month with expense-type filtering.</p>
           </div>
+          <select
+            value={monthlyExpenseTypeId || ''}
+            onChange={(event) => setMonthlyExpenseTypeId(event.target.value ? parseInt(event.target.value) : null)}
+            className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-primary-400"
+          >
+            <option value="">All Expense Types</option>
+            {sortedExpenseTypes.map((type) => (
+              <option key={type.id} value={type.id}>{sanitizeDisplayText(type.name)}</option>
+            ))}
+          </select>
         </div>
 
         {loadingMonthly ? <LoadingSpinner /> : (
@@ -208,8 +230,11 @@ export default function ExpensesPage() {
             <>
               <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
                 <div className="rounded-2xl bg-red-50 px-4 py-4 border border-red-100 lg:col-span-1">
-                  <p className="text-xs font-bold uppercase tracking-wide text-red-600">Overall Monthly Expenses</p>
+                  <p className="text-xs font-bold uppercase tracking-wide text-red-600">Total Monthly Expenses</p>
                   <p className="text-2xl font-bold text-red-700 mt-2">{formatRs(monthlyTotal)}</p>
+                  {monthlyExpenseTypeId && (
+                    <p className="text-xs text-red-500 mt-1">Filtered: {formatRs(filteredMonthlyTotal)}</p>
+                  )}
                 </div>
                 {monthlyShopTotals.map((shop) => (
                   <div key={shop.code} className={`rounded-2xl border px-4 py-4 ${shop.color}`}>
@@ -226,7 +251,7 @@ export default function ExpensesPage() {
                     <div key={expense.id} className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 rounded-xl px-3 py-2">
                       <div>
                         <p className="text-sm font-medium text-gray-800">
-                          {sanitizeDisplayText(expense.expenseTypeName)} · {sanitizeDisplayText(expense.shopName, expense.shopCode || 'Shop')}
+                          {sanitizeDisplayText(expense.expenseTypeName)} · {sanitizeDisplayText(expense.shopName, expense.shopCode || 'Department')}
                         </p>
                         <p className="text-xs text-gray-500">
                           {sanitizeDisplayText(expense.description)} · {expense.businessDate || 'No date'}
@@ -250,24 +275,6 @@ export default function ExpensesPage() {
       </div>
 
       <div className="flex items-center gap-3 mb-6 flex-wrap">
-        <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-          <button onClick={() => setSelectedDate((date) => subDays(date, 1))}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <input
-            type="date"
-            value={dateStr}
-            max={format(new Date(), 'yyyy-MM-dd')}
-            onChange={(event) => event.target.value && setSelectedDate(new Date(event.target.value + 'T00:00:00'))}
-            className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
-          />
-          <button onClick={() => setSelectedDate((date) => addDays(date, 1))} disabled={isToday}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-
         <select
           value={filterExpenseTypeId || ''}
           onChange={(event) => setFilterExpenseTypeId(event.target.value ? parseInt(event.target.value) : null)}
@@ -279,13 +286,6 @@ export default function ExpensesPage() {
           ))}
         </select>
 
-        {!isToday && (
-          <button onClick={() => setSelectedDate(new Date())}
-            className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
-            Today
-          </button>
-        )}
-        <span className="text-xs text-gray-400">{format(selectedDate, 'EEEE, MMMM d, yyyy')}</span>
         {!loadingDaily && (
           <span className="ml-auto font-bold text-red-600 text-sm bg-red-50 px-3 py-1.5 rounded-xl">
             Total: {formatRs(grandTotal)}

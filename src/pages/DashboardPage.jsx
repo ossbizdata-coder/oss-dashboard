@@ -177,7 +177,7 @@ export default function DashboardPage() {
           </div>
 
           <h2 className="text-base font-semibold text-gray-700 mb-3">
-            Shop Summaries
+            Department Summaries
             <span className="ml-2 text-xs font-normal text-gray-400">
               {isToday ? 'Today' : format(selectedDate, 'MMM d')}
             </span>
