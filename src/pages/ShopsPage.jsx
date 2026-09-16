@@ -95,7 +95,7 @@ export default function ShopsPage() {
                   <Icon size={24} className="text-white" />
                 </div>
                 <div className="flex-1">
-                <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">{label}</h2>
+                <h2 className="text-2xl font-semibold text-gray-900 tracking-tight">{label}</h2>
                 <p className="text-sm font-medium text-gray-500 mt-0.5">Department Code: {code}</p>
                 </div>
                 <Link
