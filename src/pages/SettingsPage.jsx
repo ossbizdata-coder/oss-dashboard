@@ -152,26 +152,33 @@ export default function SettingsPage() {
                   <Wallet size={18} className="text-primary-700" />
                   <h2 className="font-semibold text-gray-800">Fixed Monthly Expenses</h2>
                 </div>
+ 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { key: 'rent', label: 'Rent' },
+                    { key: 'electric', label: 'Electricity' },
+                    { key: 'internet', label: 'Internet' },
+                    { key: 'other', label: 'Other' },
+                  ].map(({ key, label }) => (
+                    <label key={key} className="block">
+                      <span className="block text-xs font-medium text-gray-500 mb-1.5">{label}</span>
+                      <input
+                        type="number"
+                        min="0"
+                        step="1"
+                        value={businessSettings.fixedMonthlyExpenses?.[key] ?? ''}
+                        onChange={(event) => updateFixedExpense(key, event.target.value)}
+                        className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                      />
+                    </label>
+                  ))}
+                </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-end">
-                  <label className="block">
-                    <span className="block text-xs font-medium text-gray-500 mb-1.5">Other</span>
-                    <input
-                      type="number"
-                      min="0"
-                      step="1"
-                      value={businessSettings.fixedMonthlyExpenses?.other ?? ''}
-                      onChange={(event) => updateFixedExpense('other', event.target.value)}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
-                    />
-                  </label>
-
-                  <div className="rounded-2xl bg-primary-50 px-4 py-3">
-                    <p className="text-xs font-medium text-primary-700 uppercase tracking-wide">Monthly Fixed Expense Total</p>
-                    <p className="text-2xl font-bold text-primary-900 mt-1">
-                      {Number(businessSettings.fixedMonthlyExpenses?.other || 0).toLocaleString('en-LK', { maximumFractionDigits: 0 })}
-                    </p>
-                  </div>
+                <div className="mt-4 rounded-2xl bg-primary-50 px-4 py-3">
+                  <p className="text-xs font-medium text-primary-700 uppercase tracking-wide">Monthly Fixed Expense Total</p>
+                  <p className="text-2xl font-bold text-primary-900 mt-1">
+                    {Object.values(businessSettings.fixedMonthlyExpenses || {}).reduce((sum, value) => sum + Number(value || 0), 0).toLocaleString('en-LK', { maximumFractionDigits: 0 })}
+                  </p>
                 </div>
               </div>
             </div>

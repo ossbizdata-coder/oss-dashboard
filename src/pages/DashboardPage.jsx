@@ -6,7 +6,7 @@ import {
   ChevronLeft, ChevronRight
 } from 'lucide-react'
 import { attendanceApi, dailyCashApi } from '../services/api.js'
-import { StatCard, PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
+import { LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
 import useBusinessSettings from '../hooks/useBusinessSettings.js'
 import { calculateCalculatedSales, calculateConfiguredProfit } from '../utils/businessSettings.js'
@@ -97,14 +97,37 @@ export default function DashboardPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Business Dashboard"
-        action={(
-          <button onClick={load} className="btn-outline flex items-center gap-2 text-sm">
-            <RefreshCw size={15} /> Refresh
-          </button>
-        )}
-      />
+      <div className="flex flex-col gap-3 mb-6 xl:flex-row xl:items-center xl:justify-between">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-gray-900">Business Dashboard</h1>
+          <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
+            <button onClick={() => setSelectedDate((date) => subDays(date, 1))}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+              <ChevronLeft size={16} />
+            </button>
+            <input
+              type="date"
+              value={dateStr}
+              max={todayStr()}
+              onChange={(event) => event.target.value && setSelectedDate(new Date(event.target.value + 'T00:00:00'))}
+              className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
+            />
+            <button onClick={() => setSelectedDate((date) => addDays(date, 1))} disabled={isToday}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          {!isToday && (
+            <button onClick={() => setSelectedDate(new Date())}
+              className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
+              Today
+            </button>
+          )}
+        </div>
+        <button onClick={load} className="btn-outline flex items-center gap-2 text-sm self-start xl:self-auto">
+          <RefreshCw size={15} /> Refresh
+        </button>
+      </div>
 
       {loadWarning && (
         <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -112,42 +135,45 @@ export default function DashboardPage() {
         </div>
       )}
 
-      <div className="flex items-center gap-3 mb-6">
-        <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-          <button onClick={() => setSelectedDate((date) => subDays(date, 1))}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-            <ChevronLeft size={16} />
-          </button>
-          <input
-            type="date"
-            value={dateStr}
-            max={todayStr()}
-            onChange={(event) => event.target.value && setSelectedDate(new Date(event.target.value + 'T00:00:00'))}
-            className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
-          />
-          <button onClick={() => setSelectedDate((date) => addDays(date, 1))} disabled={isToday}
-            className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
-            <ChevronRight size={16} />
-          </button>
-        </div>
-        {!isToday && (
-          <button onClick={() => setSelectedDate(new Date())}
-            className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
-            Today
-          </button>
-        )}
-        <span className="text-sm text-gray-500">
-          {isToday ? 'Today' : format(selectedDate, 'EEE, MMM d, yyyy')}
-        </span>
-      </div>
-
       {loading ? <LoadingSpinner size="lg" /> : (
         <>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <StatCard title="Sales" value={formatRs(totalSales)} icon={TrendingUp} color="green" subtitle="All shops combined" />
-            <StatCard title="Expenses" value={formatRs(totalExpenses)} icon={TrendingDown} color="red" subtitle="All shops combined" />
-            <StatCard title="Profit" value={formatRs(totalProfit)} icon={DollarSign} color="blue" subtitle="Using settings profit rates" />
-            <StatCard title="Credits" value={formatRs(totalDailyCredits)} icon={CreditCard} color="orange" subtitle="Credits given this day" />
+            <div className="card border-l-4 border-emerald-500 bg-gradient-to-br from-emerald-50 via-white to-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[15px] font-semibold text-gray-700">Sales</p>
+                  <p className="text-[23px] font-extrabold text-emerald-700 mt-2">{formatRs(totalSales)}</p>
+                </div>
+                <div className="rounded-xl bg-emerald-100 p-2.5 text-emerald-700"><TrendingUp size={18} /></div>
+              </div>
+            </div>
+            <div className="card border-l-4 border-red-500 bg-gradient-to-br from-red-50 via-white to-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[15px] font-semibold text-gray-700">Expenses</p>
+                  <p className="text-[23px] font-extrabold text-red-700 mt-2">{formatRs(totalExpenses)}</p>
+                </div>
+                <div className="rounded-xl bg-red-100 p-2.5 text-red-700"><TrendingDown size={18} /></div>
+              </div>
+            </div>
+            <div className="card border-l-4 border-blue-500 bg-gradient-to-br from-blue-50 via-white to-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[15px] font-semibold text-gray-700">Profit</p>
+                  <p className="text-[23px] font-extrabold text-blue-700 mt-2">{formatRs(totalProfit)}</p>
+                </div>
+                <div className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><DollarSign size={18} /></div>
+              </div>
+            </div>
+            <div className="card border-l-4 border-amber-500 bg-gradient-to-br from-amber-50 via-white to-white p-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-[15px] font-semibold text-gray-700">Credits</p>
+                  <p className="text-[23px] font-extrabold text-amber-700 mt-2">{formatRs(totalDailyCredits)}</p>
+                </div>
+                <div className="rounded-xl bg-amber-100 p-2.5 text-amber-700"><CreditCard size={18} /></div>
+              </div>
+            </div>
           </div>
 
           <h2 className="text-base font-semibold text-gray-700 mb-3">
@@ -208,26 +234,13 @@ export default function DashboardPage() {
             })}
           </div>
 
-          <div className="card max-w-xl">
-            <h2 className="text-base font-semibold text-gray-800 mb-4">
-              <Users size={16} className="inline mr-2" />Staff Today
-              <span className="ml-1 text-xs font-normal text-gray-400">(Admin)</span>
-            </h2>
-            <div className="text-4xl font-bold text-primary-700 mb-1">{workingToday}</div>
-            <div className="text-sm text-gray-500 mb-4">admins working {isToday ? 'today' : format(selectedDate, 'MMM d')}</div>
-            <div className="space-y-2">
-              {adminStaff.length === 0 ? (
-                <p className="text-sm text-gray-400">No attendance records for this date</p>
-              ) : adminStaff.slice(0, 8).map((item, index) => (
-                <div key={index} className="flex items-center justify-between text-sm">
-                  <span className="text-gray-700 font-medium">{item.userName || item.name || 'Staff'}</span>
-                  <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
-                    (item.status === 'WORKING' || item.isWorking) ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'
-                  }`}>
-                    {(item.status === 'WORKING' || item.isWorking) ? 'In' : 'Off'}
-                  </span>
-                </div>
-              ))}
+          <div className="card max-w-xl py-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <Users size={16} className="text-gray-500" />
+                <h2 className="text-sm font-semibold text-gray-700">Working Staff Today</h2>
+              </div>
+              <div className="text-2xl font-bold text-primary-700">{workingToday}</div>
             </div>
           </div>
         </>

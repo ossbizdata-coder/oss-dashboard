@@ -9,6 +9,9 @@ export const DEFAULT_BUSINESS_SETTINGS = {
     FOODHUT: 20,
   },
   fixedMonthlyExpenses: {
+    rent: 0,
+    electric: 0,
+    internet: 0,
     other: 0,
   },
 }
@@ -29,6 +32,9 @@ function normalizeProfitRates(rates = {}) {
 
 function normalizeFixedMonthlyExpenses(expenses = {}) {
   return {
+    rent: toNumber(expenses.rent ?? DEFAULT_BUSINESS_SETTINGS.fixedMonthlyExpenses.rent),
+    electric: toNumber(expenses.electric ?? DEFAULT_BUSINESS_SETTINGS.fixedMonthlyExpenses.electric),
+    internet: toNumber(expenses.internet ?? DEFAULT_BUSINESS_SETTINGS.fixedMonthlyExpenses.internet),
     other: toNumber(expenses.other ?? DEFAULT_BUSINESS_SETTINGS.fixedMonthlyExpenses.other),
   }
 }
@@ -85,7 +91,8 @@ export function calculateConfiguredProfit(shopCode, salesAmount, settings) {
 
 export function getTotalFixedMonthlyExpenses(settings) {
   const normalized = settings ? normalizeBusinessSettings(settings) : getBusinessSettings()
-  return toNumber(normalized.fixedMonthlyExpenses?.other)
+  const values = normalized.fixedMonthlyExpenses || {}
+  return Object.values(values).reduce((sum, value) => sum + toNumber(value), 0)
 }
 
 export function getDailyFixedExpenseShare(settings, targetDate = new Date()) {

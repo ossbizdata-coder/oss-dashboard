@@ -201,7 +201,7 @@ export default function MonthlyPage() {
             <div className="card bg-gradient-to-br from-green-50 to-white border border-green-100">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp size={16} className="text-green-600" />
-                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</span>
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Sales</span>
               </div>
               <p className="text-2xl font-bold text-green-700">{formatRs(monthlyRevenue)}</p>
               <p className="text-xs text-gray-400 mt-1">All shops · {MONTHS[month - 1]} {year}</p>
@@ -252,7 +252,7 @@ export default function MonthlyPage() {
                   </div>
                   <div className="space-y-3 text-sm">
                     <div className="flex justify-between">
-                      <span className="text-gray-500">Revenue</span>
+                      <span className="text-gray-500">Sales</span>
                       <span className="font-bold text-green-700">{formatRs(shop.totalSales)}</span>
                     </div>
                     <div className="flex justify-between">
