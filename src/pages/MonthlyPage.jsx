@@ -163,9 +163,9 @@ export default function MonthlyPage() {
                 <ChevronRight size={16} />
               </button>
             </div>
-            <div className="rounded-2xl bg-primary-50 border border-primary-100 px-3 py-2">
-              <p className="text-[11px] font-bold uppercase tracking-wide text-primary-700">No of Working Days</p>
-              <p className="text-sm font-semibold text-primary-900 mt-0.5">{monthlyWorkingDays}</p>
+            <div className="rounded-2xl bg-primary-50 border border-primary-100 px-3 py-2 flex items-center gap-2">
+              <span className="text-[11px] font-bold uppercase tracking-wide text-primary-700 whitespace-nowrap">Working Days :</span>
+              <span className="text-sm font-semibold text-primary-900">{monthlyWorkingDays}</span>
             </div>
             {!isCurrentMonth && (
               <button onClick={() => setSelectedMonth(startOfMonth(new Date()))}

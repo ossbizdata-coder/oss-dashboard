@@ -91,16 +91,16 @@ export default function ShopsPage() {
           return (
             <div key={code} className="card">
               <div className="flex items-center gap-4 mb-6">
-                <div className={`w-12 h-12 ${bg} rounded-2xl flex items-center justify-center`}>
+              <div className={`w-12 h-12 ${bg} rounded-2xl flex items-center justify-center shadow-sm`}>
                   <Icon size={24} className="text-white" />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-xl font-bold text-gray-900">{label}</h2>
-                  <p className="text-sm text-gray-500">Department Code: {code}</p>
+                <h2 className="text-2xl font-extrabold text-gray-900 tracking-tight">{label}</h2>
+                <p className="text-sm font-medium text-gray-500 mt-0.5">Department Code: {code}</p>
                 </div>
                 <Link
                   to={`/shops/${code}`}
-                  className="flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border"
+                className="flex items-center gap-2 text-sm font-semibold px-4 py-2 rounded-xl border bg-white shadow-sm hover:shadow-md transition-all"
                   style={{ borderColor: color, color }}
                 >
                   View Details <ArrowRight size={14} />
@@ -116,9 +116,9 @@ export default function ShopsPage() {
                   { label: 'Credits', value: formatRs(s.totalCredits), color: 'text-orange-600' },
                   { label: 'Profit', value: formatRs(profit), color: 'text-blue-700 font-bold' },
                 ].map(({ label: l, value, color: c }) => (
-                  <div key={l} className={`${lightBg} rounded-xl p-3`}>
-                    <p className="text-xs text-gray-500">{l}</p>
-                    <p className={`text-sm font-semibold mt-1 ${c}`}>{loading ? '...' : value}</p>
+                <div key={l} className={`${lightBg} rounded-2xl p-4 border border-white/70 shadow-sm`}>
+                  <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">{l}</p>
+                  <p className={`text-lg sm:text-xl font-bold mt-2 ${c}`}>{loading ? '...' : value}</p>
                   </div>
                 ))}
               </div>
