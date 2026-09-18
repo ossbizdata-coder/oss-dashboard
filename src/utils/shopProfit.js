@@ -1,7 +1,7 @@
 export const SHOP_PROFIT_MARGINS = {
   CAFE: 0.12,
   BOOKSHOP: 0.15,
-  FOODHUT: 0.20,
+  FOODHUT: 0.25,
 }
 
 export const getShopMarginRate = (shopCode) => {

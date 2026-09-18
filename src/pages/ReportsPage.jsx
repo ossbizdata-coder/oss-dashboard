@@ -19,9 +19,9 @@ const COLORS = ['#22c55e', '#3f51b5', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4'
 
 export default function ReportsPage() {
   const { isSuperAdmin } = useAuth()
-  const [businessSettings] = useBusinessSettings()
   const [reportType, setReportType] = useState('monthly')
   const [selectedMonth, setSelectedMonth] = useState(new Date())
+  const [businessSettings] = useBusinessSettings(selectedMonth)
   const [shopData, setShopData] = useState([])
   const [expenseData, setExpenseData] = useState([])
   const [topItemsData, setTopItemsData] = useState([])

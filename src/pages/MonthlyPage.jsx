@@ -4,7 +4,7 @@ import {
   Coffee, BookOpen, UtensilsCrossed, RefreshCw,
   ChevronLeft, ChevronRight
 } from 'lucide-react'
-import { dailyCashApi, salaryApi } from '../services/api.js'
+import { businessSettingsApi, dailyCashApi, salaryApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { subMonths, addMonths, startOfMonth } from 'date-fns'
@@ -12,7 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 import useBusinessSettings from '../hooks/useBusinessSettings.js'
-import { calculateConfiguredProfit, getTotalFixedMonthlyExpenses, toNumber } from '../utils/businessSettings.js'
+import { calculateConfiguredProfit, getBusinessSettings, getTotalFixedMonthlyExpenses, toNumber } from '../utils/businessSettings.js'
 
 const SHOP_META = {
   CAFE: { label: 'Cafe', icon: Coffee, bg: 'bg-[#068A4B]' },
@@ -28,8 +28,8 @@ const getMonthlyRevenue = (summary = {}) => getTrackedShops(summary).reduce((sum
 
 export default function MonthlyPage() {
   const { isSuperAdmin } = useAuth()
-  const [businessSettings] = useBusinessSettings()
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()))
+  const [businessSettings] = useBusinessSettings(selectedMonth)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
   const [monthlySalary, setMonthlySalary] = useState(0)
@@ -74,11 +74,14 @@ export default function MonthlyPage() {
       let ytdExpenses = 0
       let ytdGross = 0
       let ytdSalary = 0
+      let ytdFixed = 0
 
       for (let currentMonth = 1; currentMonth <= month; currentMonth += 1) {
-        const [summaryRes, salaryRes] = await Promise.allSettled([
+        const monthDate = new Date(year, currentMonth - 1, 1)
+        const [summaryRes, salaryRes, settingsRes] = await Promise.allSettled([
           dailyCashApi.getMonthlySummary(year, currentMonth),
           salaryApi.getAdminMonthly(year, currentMonth),
+          businessSettingsApi.get(year, currentMonth),
         ])
 
         if (summaryRes.status === 'fulfilled') {
@@ -92,17 +95,22 @@ export default function MonthlyPage() {
           const rows = salaryRes.value.data || []
           ytdSalary += rows.reduce((sum, row) => sum + toNumber(row.totalSalary), 0)
         }
+
+        if (settingsRes.status === 'fulfilled') {
+          ytdFixed += getTotalFixedMonthlyExpenses(settingsRes.value.data, monthDate)
+        } else {
+          ytdFixed += getTotalFixedMonthlyExpenses(getBusinessSettings(monthDate), monthDate)
+        }
       }
 
       const monthlyFixedExpenses = getTotalFixedMonthlyExpenses(businessSettings)
-      const ytdFixedExpenses = monthlyFixedExpenses * month
       setYtd({
         sales: ytdSales,
         expenses: ytdExpenses,
         salary: ytdSalary,
-        fixed: ytdFixedExpenses,
+        fixed: ytdFixed,
         gross: ytdGross,
-        net: ytdGross - ytdSalary - ytdFixedExpenses,
+        net: ytdGross - ytdSalary - ytdFixed,
       })
     } catch (_) {
       setData(null)

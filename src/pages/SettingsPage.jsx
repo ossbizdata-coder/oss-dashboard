@@ -1,8 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useMemo, useEffect, useState } from 'react'
 import { Tag, Trash2, Plus, Percent, Wallet, Save } from 'lucide-react'
 import { Badge, EmptyState, LoadingSpinner, PageHeader } from '../components/ui.jsx'
-import { expenseTypeApi } from '../services/api.js'
-import { getBusinessSettings, saveBusinessSettings, sanitizeDisplayText } from '../utils/businessSettings.js'
+import { businessSettingsApi, expenseTypeApi } from '../services/api.js'
+import useBusinessSettings from '../hooks/useBusinessSettings.js'
+import { extractBusinessSettingsPayload, getMonthKey, saveBusinessSettings, sanitizeDisplayText, toBusinessSettingsPayload } from '../utils/businessSettings.js'
 
 const SHOP_OPTIONS = [
   { value: 'COMMON', label: 'Common' },
@@ -19,17 +20,18 @@ const PROFIT_RATE_FIELDS = [
 
 export default function SettingsPage() {
   const [tab, setTab] = useState('business')
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date())
   const [expenseTypes, setExpenseTypes] = useState([])
   const [loading, setLoading] = useState(true)
   const [newExpense, setNewExpense] = useState('')
   const [newExpenseShopType, setNewExpenseShopType] = useState('COMMON')
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [businessSettings, setBusinessSettings] = useState(() => getBusinessSettings())
+  const [businessSettings, setBusinessSettings] = useBusinessSettings(selectedMonth)
+  const selectedMonthKey = useMemo(() => getMonthKey(selectedMonth), [selectedMonth])
 
   const load = async () => {
     setLoading(true)
-    setBusinessSettings(getBusinessSettings())
     try {
       const response = await expenseTypeApi.getAll()
       setExpenseTypes(response.data || [])
@@ -63,11 +65,22 @@ export default function SettingsPage() {
     await load()
   }
 
-  const handleSaveBusinessSettings = () => {
+  const handleSaveBusinessSettings = async () => {
     setSaving(true)
-    const saved = saveBusinessSettings(businessSettings)
-    setBusinessSettings(saved)
-    window.setTimeout(() => setSaving(false), 400)
+    try {
+      const payload = toBusinessSettingsPayload({ ...businessSettings, monthKey: selectedMonthKey }, selectedMonthKey)
+      const response = await businessSettingsApi.save(payload)
+      const responseData = response.data
+      const persisted = responseData && Object.keys(responseData).length > 0
+        ? extractBusinessSettingsPayload(responseData, selectedMonthKey)
+        : payload
+      const saved = saveBusinessSettings(persisted, selectedMonthKey)
+      setBusinessSettings(saved)
+    } catch (error) {
+      alert(error?.response?.data?.message || error?.response?.data || error.message)
+    } finally {
+      setSaving(false)
+    }
   }
 
   const updateProfitRate = (shopCode, value) => {
@@ -119,7 +132,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between gap-4 mb-6">
                   <div>
                     <h2 className="font-semibold text-gray-800">Profit Rates</h2>
-                    <p className="text-sm text-gray-500 mt-1">Used for dashboard, shop, monthly summary, and monthly report profit calculations.</p>
+                    <p className="text-sm text-gray-500 mt-1">These rates are saved once and used for dashboard, shop, monthly summary, and report profit calculations.</p>
                   </div>
                   <button
                     onClick={handleSaveBusinessSettings}
@@ -148,16 +161,30 @@ export default function SettingsPage() {
               </div>
 
               <div className="card">
-                <div className="flex items-center gap-2 mb-4">
-                  <Wallet size={18} className="text-primary-700" />
-                  <h2 className="font-semibold text-gray-800">Fixed Monthly Expenses</h2>
+                <div className="flex flex-col gap-4 mb-4 md:flex-row md:items-center md:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Wallet size={18} className="text-primary-700" />
+                    <div>
+                      <h2 className="font-semibold text-gray-800">Fixed Monthly Expenses</h2>
+                      <p className="text-sm text-gray-500 mt-1">These values are saved separately for each month.</p>
+                    </div>
+                  </div>
+                  <label className="block">
+                    <span className="block text-xs font-medium text-gray-500 mb-1.5">Month</span>
+                    <input
+                      type="month"
+                      value={selectedMonthKey}
+                      onChange={(event) => event.target.value && setSelectedMonth(new Date(`${event.target.value}-01T00:00:00`))}
+                      className="px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    />
+                  </label>
                 </div>
  
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {[
-                    { key: 'rent', label: 'Rent' },
-                    { key: 'electric', label: 'Electricity' },
-                    { key: 'internet', label: 'Internet' },
+                    { key: 'buildingRental', label: 'Building Rental' },
+                    { key: 'electricityBill', label: 'Electricity Bill' },
+                    { key: 'internetFees', label: 'Internet Fees' },
                     { key: 'other', label: 'Other' },
                   ].map(({ key, label }) => (
                     <label key={key} className="block">

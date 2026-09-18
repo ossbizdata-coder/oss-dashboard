@@ -19,8 +19,8 @@ export default function ShopDetailPage() {
   const { shopCode } = useParams()
   const { isSuperAdmin } = useAuth()
   const meta = SHOP_META[shopCode?.toUpperCase()] || { label: shopCode, color: '#666', bg: 'bg-gray-500' }
-  const [businessSettings] = useBusinessSettings()
   const [selectedDate, setSelectedDate] = useState(new Date())
+  const [businessSettings] = useBusinessSettings(selectedDate)
   const [summary, setSummary] = useState(null)
   const [dailyCashId, setDailyCashId] = useState(null)
   const [transactions, setTransactions] = useState([])

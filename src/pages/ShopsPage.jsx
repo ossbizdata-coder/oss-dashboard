@@ -17,7 +17,7 @@ export default function ShopsPage() {
   const [summaries, setSummaries] = useState({})
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [businessSettings] = useBusinessSettings()
+  const [businessSettings] = useBusinessSettings(selectedDate)
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd')

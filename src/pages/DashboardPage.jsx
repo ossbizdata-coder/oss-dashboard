@@ -26,7 +26,7 @@ export default function DashboardPage() {
   const [shopSummaries, setShopSummaries] = useState({})
   const [attendance, setAttendance] = useState([])
   const [loadWarning, setLoadWarning] = useState('')
-  const [businessSettings] = useBusinessSettings()
+  const [businessSettings] = useBusinessSettings(selectedDate)
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
   const isToday = dateStr === todayStr()

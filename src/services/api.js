@@ -118,6 +118,12 @@ export const expenseTypeApi = {
   delete: (id) => api.delete(`/expenses/types/${id}`),
 }
 
+// ── BUSINESS SETTINGS ────────────────────────────────────────────────────────
+export const businessSettingsApi = {
+  get: (year, month) => api.get('/settings/business', { params: { year, month } }),
+  save: (data) => api.put('/settings/business', data),
+}
+
 // ── ADMIN TRANSACTIONS ─────────────────────────────────────────────────────
 export const adminTransactionApi = {
   getById: (id) => api.get(`/admin/transactions/${id}`),
