@@ -62,7 +62,7 @@ export default function App() {
             <Route path="reports" element={<ReportsPage />} />
             <Route path="monthly" element={<SuperAdminRoute><MonthlyPage /></SuperAdminRoute>} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
-            <Route path="settings" element={<SettingsPage />} />
+            <Route path="settings" element={<SuperAdminRoute><SettingsPage /></SuperAdminRoute>} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>

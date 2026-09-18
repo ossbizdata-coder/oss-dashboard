@@ -26,6 +26,11 @@ export function toNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
+export function canSyncBusinessSettings() {
+  if (typeof window === 'undefined') return false
+  return window.localStorage.getItem('role') === 'SUPERADMIN'
+}
+
 export function getMonthKey(targetDate = new Date()) {
   if (typeof targetDate === 'string' && MONTH_KEY_PATTERN.test(targetDate.trim())) {
     return targetDate.trim()
