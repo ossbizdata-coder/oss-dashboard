@@ -190,6 +190,22 @@ export function calculateConfiguredProfit(shopCode, salesAmount, settings) {
   return Math.round((sales * rate) / 100)
 }
 
+export function getReloadExpenseAmount(expenses = []) {
+  if (!Array.isArray(expenses)) return 0
+
+  return expenses.reduce((sum, expense) => {
+    const typeName = String(expense?.expenseTypeName || '').trim().toLowerCase()
+    if (typeName !== 'reload') return sum
+    return sum + Math.max(0, toNumber(expense?.amount))
+  }, 0)
+}
+
+export function calculateReloadAdjustedProfit(totalSales, reloadExpense) {
+  const sales = Math.max(0, toNumber(totalSales))
+  const reload = Math.max(0, toNumber(reloadExpense))
+  return Math.round((sales * 0.12) - (reload * 0.004))
+}
+
 export function getTotalFixedMonthlyExpenses(settings, targetDate = new Date()) {
   const normalized = settings ? extractBusinessSettingsPayload(settings, targetDate) : getBusinessSettings(targetDate)
   const values = normalized.fixedMonthlyExpenses || {}

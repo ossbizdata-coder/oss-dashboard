@@ -8,8 +8,7 @@ import {
 import { attendanceApi, dailyCashApi } from '../services/api.js'
 import { LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
-import useBusinessSettings from '../hooks/useBusinessSettings.js'
-import { calculateCalculatedSales, calculateConfiguredProfit } from '../utils/businessSettings.js'
+import { calculateCalculatedSales, calculateReloadAdjustedProfit, getReloadExpenseAmount } from '../utils/businessSettings.js'
 
 const SHOPS = ['CAFE', 'BOOKSHOP', 'FOODHUT']
 const SHOP_CARDS = [
@@ -26,7 +25,6 @@ export default function DashboardPage() {
   const [shopSummaries, setShopSummaries] = useState({})
   const [attendance, setAttendance] = useState([])
   const [loadWarning, setLoadWarning] = useState('')
-  const [businessSettings] = useBusinessSettings(selectedDate)
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
   const isToday = dateStr === todayStr()
@@ -46,6 +44,7 @@ export default function DashboardPage() {
           totalCredits: data.totalCredits || 0,
           manualSales: data.manualSales || 0,
           calculatedSales: data.totalSales || 0,
+          reloadExpense: getReloadExpenseAmount(data.expenses || []),
         }
       }
 
@@ -73,12 +72,17 @@ export default function DashboardPage() {
   useEffect(() => { load() }, [dateStr])
 
   const calcSales = (summary) => calculateCalculatedSales(summary)
-  const calcProfit = (shopCode) => calculateConfiguredProfit(shopCode, calcSales(shopSummaries[shopCode]), businessSettings)
+  const calcProfit = (shopCode) => calculateReloadAdjustedProfit(
+    calcSales(shopSummaries[shopCode]),
+    shopSummaries[shopCode]?.reloadExpense
+  )
 
   const totalSales = SHOPS.reduce((sum, shopCode) => sum + calcSales(shopSummaries[shopCode]), 0)
   const totalExpenses = SHOPS.reduce((sum, shopCode) => sum + (shopSummaries[shopCode]?.totalExpenses || 0), 0)
   const totalProfit = SHOPS.reduce((sum, shopCode) => sum + calcProfit(shopCode), 0)
   const totalDailyCredits = SHOPS.reduce((sum, shopCode) => sum + (shopSummaries[shopCode]?.totalCredits || 0), 0)
+  const totalReloadExpense = SHOPS.reduce((sum, shopCode) => sum + (shopSummaries[shopCode]?.reloadExpense || 0), 0)
+  const reloadAdjustment = Math.round(totalReloadExpense * 0.004)
 
   const adminStaffRaw = attendance.filter((item) =>
     (item.userRole === 'ADMIN' || item.userRole === 'SUPERADMIN') &&
@@ -161,6 +165,11 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-[15px] font-semibold text-gray-700">Profit</p>
                   <p className="text-[23px] font-extrabold text-blue-700 mt-2">{formatRs(totalProfit)}</p>
+                  {totalReloadExpense > 0 && (
+                    <p className="text-[11px] text-blue-700/80 mt-1">
+                      Reload adjusted (−{formatRs(reloadAdjustment)}) from {formatRs(totalReloadExpense)} reload expense
+                    </p>
+                  )}
                 </div>
                 <div className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><DollarSign size={18} /></div>
               </div>
@@ -186,15 +195,18 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {SHOP_CARDS.map(({ code, label, icon: Icon, border, text, bg }) => {
               const summary = shopSummaries[code] || {}
+              const shopDateLink = `/shops/${code}?date=${encodeURIComponent(dateStr)}`
 
               return (
-                <Link key={code} to={`/shops/${code}`} className={`card hover:shadow-md transition-shadow border-l-4 ${border} group`}>
+                <div key={code} className={`card hover:shadow-md transition-shadow border-l-4 ${border} group`}>
                   <div className="flex items-center gap-3 mb-4">
                     <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center`}>
                       <Icon size={20} className="text-white" />
                     </div>
                     <h3 className={`font-semibold ${text}`}>{label}</h3>
-                    <span className="ml-auto text-xs text-gray-400 group-hover:text-primary-600 transition-colors">View →</span>
+                    <Link to={shopDateLink} className="ml-auto text-xs text-gray-400 group-hover:text-primary-600 transition-colors">
+                      View →
+                    </Link>
                   </div>
 
                   <div className="space-y-3 text-sm">
@@ -216,20 +228,29 @@ export default function DashboardPage() {
                       </div>
                       <div className="rounded-xl bg-red-50 px-3 py-2">
                         <p className="text-gray-500 text-xs">Expenses</p>
-                        <p className="font-bold text-red-600 mt-1">{formatRs(summary.totalExpenses)}</p>
+                        <Link to={shopDateLink} className="font-bold text-red-600 mt-1 inline-block hover:underline">
+                          {formatRs(summary.totalExpenses)}
+                        </Link>
                       </div>
                       <div className="rounded-xl bg-amber-50 px-3 py-2">
                         <p className="text-gray-500 text-xs">Credits</p>
-                        <p className="font-bold text-amber-600 mt-1">{formatRs(summary.totalCredits)}</p>
+                        <Link to={shopDateLink} className="font-bold text-amber-600 mt-1 inline-block hover:underline">
+                          {formatRs(summary.totalCredits)}
+                        </Link>
                       </div>
                     </div>
 
                     <div className="rounded-xl bg-blue-50 px-3 py-3">
                       <p className="text-gray-500 text-xs">Profit</p>
                       <p className="font-bold text-blue-700 text-lg mt-1">{formatRs(calcProfit(code))}</p>
+                      {(summary.reloadExpense || 0) > 0 && (
+                        <p className="text-[10px] text-blue-700/80 mt-1">
+                          Reload adjusted
+                        </p>
+                      )}
                     </div>
                   </div>
-                </Link>
+                </div>
               )
             })}
           </div>

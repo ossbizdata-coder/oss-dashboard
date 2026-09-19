@@ -8,7 +8,7 @@ import {
 } from 'recharts'
 import useBusinessSettings from '../hooks/useBusinessSettings.js'
 import {
-  calculateConfiguredProfit,
+  calculateReloadAdjustedProfit,
   getTotalFixedMonthlyExpenses,
   sanitizeDisplayText,
   toNumber,
@@ -16,6 +16,17 @@ import {
 
 const SHOP_NAMES = { CAFE: 'Cafe', BOOKSHOP: 'Bookshop', FOODHUT: 'Food Hut' }
 const COLORS = ['#22c55e', '#3f51b5', '#ef4444', '#f59e0b', '#8b5cf6', '#06b6d4', '#ec4899']
+const getReloadByShop = (expenseItems = []) => {
+  if (!Array.isArray(expenseItems)) return {}
+  return expenseItems.reduce((acc, item) => {
+    const typeName = String(item?.expenseTypeName || '').trim().toLowerCase()
+    if (typeName !== 'reload') return acc
+    const shopCode = String(item?.shopCode || '').toUpperCase()
+    if (!shopCode) return acc
+    acc[shopCode] = (acc[shopCode] || 0) + Math.max(0, toNumber(item?.amount))
+    return acc
+  }, {})
+}
 
 export default function ReportsPage() {
   const { isSuperAdmin } = useAuth()
@@ -46,6 +57,10 @@ export default function ReportsPage() {
         creditApi.getAll(),
         salaryPromise,
       ])
+      const monthlyExpenseItems = monthlyExpenses.status === 'fulfilled'
+        ? (monthlyExpenses.value.data || [])
+        : []
+      const reloadByShop = getReloadByShop(monthlyExpenseItems)
 
       let currentShopData = []
 
@@ -58,7 +73,7 @@ export default function ReportsPage() {
             const credits = toNumber(shop.totalCredits)
             const cash = Math.max(0, sales - credits)
             const expenses = toNumber(shop.totalExpenses)
-            const profit = calculateConfiguredProfit(shop.shopCode, sales, businessSettings)
+            const profit = calculateReloadAdjustedProfit(sales, reloadByShop[shop.shopCode] || 0)
             const margin = sales > 0 ? (profit / sales) * 100 : 0
 
             return {
@@ -76,10 +91,6 @@ export default function ReportsPage() {
       } else {
         setShopData([])
       }
-
-      const monthlyExpenseItems = monthlyExpenses.status === 'fulfilled'
-        ? (monthlyExpenses.value.data || [])
-        : []
 
       if (monthlyExpenseItems.length > 0) {
         const groupedByType = {}

@@ -4,7 +4,7 @@ import {
   Coffee, BookOpen, UtensilsCrossed, RefreshCw,
   ChevronLeft, ChevronRight
 } from 'lucide-react'
-import { businessSettingsApi, dailyCashApi, salaryApi } from '../services/api.js'
+import { businessSettingsApi, dailyCashApi, salaryApi, reportApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { subMonths, addMonths, startOfMonth } from 'date-fns'
@@ -12,8 +12,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts'
 import useBusinessSettings from '../hooks/useBusinessSettings.js'
-import { calculateConfiguredProfit, getBusinessSettings, getTotalFixedMonthlyExpenses, toNumber } from '../utils/businessSettings.js'
-
+import { calculateReloadAdjustedProfit, getBusinessSettings, getTotalFixedMonthlyExpenses, toNumber } from '../utils/businessSettings.js'
 const SHOP_META = {
   CAFE: { label: 'Cafe', icon: Coffee, bg: 'bg-[#068A4B]' },
   BOOKSHOP: { label: 'Bookshop', icon: BookOpen, bg: 'bg-[#1565C0]' },
@@ -26,12 +25,25 @@ const getTrackedShops = (summary = {}) => (summary.shops || []).filter((shop) =>
 
 const getMonthlyRevenue = (summary = {}) => getTrackedShops(summary).reduce((sum, shop) => sum + toNumber(shop.totalSales), 0)
 
+const getReloadByShop = (expenseItems = []) => {
+  if (!Array.isArray(expenseItems)) return {}
+  return expenseItems.reduce((acc, item) => {
+    const typeName = String(item?.expenseTypeName || '').trim().toLowerCase()
+    if (typeName !== 'reload') return acc
+    const code = String(item?.shopCode || '').toUpperCase()
+    if (!code) return acc
+    acc[code] = (acc[code] || 0) + Math.max(0, toNumber(item?.amount))
+    return acc
+  }, {})
+}
+
 export default function MonthlyPage() {
   const { isSuperAdmin } = useAuth()
   const [selectedMonth, setSelectedMonth] = useState(startOfMonth(new Date()))
   const [businessSettings] = useBusinessSettings(selectedMonth)
   const [loading, setLoading] = useState(true)
   const [data, setData] = useState(null)
+  const [reloadByShop, setReloadByShop] = useState({})
   const [monthlySalary, setMonthlySalary] = useState(0)
   const [monthlyWorkingDays, setMonthlyWorkingDays] = useState(0)
   const [ytd, setYtd] = useState({ sales: 0, expenses: 0, salary: 0, fixed: 0, gross: 0, net: 0 })
@@ -40,23 +52,27 @@ export default function MonthlyPage() {
   const month = selectedMonth.getMonth() + 1
   const isCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth() + 1
 
-  const getShopProfit = (shopCode, totalSales) => calculateConfiguredProfit(shopCode, totalSales, businessSettings)
+  const getShopProfit = (shopCode, totalSales, reloadMap = reloadByShop) =>
+    calculateReloadAdjustedProfit(totalSales, reloadMap[shopCode] || 0)
 
-  const getOverallProfit = (summary = {}) => getTrackedShops(summary).reduce(
-    (sum, shop) => sum + getShopProfit(shop.shopCode, shop.totalSales),
+  const getOverallProfit = (summary = {}, reloadMap = reloadByShop) => getTrackedShops(summary).reduce(
+    (sum, shop) => sum + getShopProfit(shop.shopCode, shop.totalSales, reloadMap),
     0
   )
 
   const load = async () => {
     setLoading(true)
     try {
-      const [monthSummaryRes, monthSalaryRes] = await Promise.allSettled([
+      const [monthSummaryRes, monthSalaryRes, monthExpenseItemsRes] = await Promise.allSettled([
         dailyCashApi.getMonthlySummary(year, month),
         salaryApi.getAdminMonthly(year, month),
+        reportApi.getMonthlyExpenseItems(year, month),
       ])
 
       const monthSummary = monthSummaryRes.status === 'fulfilled' ? (monthSummaryRes.value.data || null) : null
       setData(monthSummary)
+      const monthExpenseItems = monthExpenseItemsRes.status === 'fulfilled' ? (monthExpenseItemsRes.value.data || []) : []
+      setReloadByShop(getReloadByShop(monthExpenseItems))
 
       let monthSalaryTotal = 0
       let monthWorkingDays = 0
@@ -78,17 +94,21 @@ export default function MonthlyPage() {
 
       for (let currentMonth = 1; currentMonth <= month; currentMonth += 1) {
         const monthDate = new Date(year, currentMonth - 1, 1)
-        const [summaryRes, salaryRes, settingsRes] = await Promise.allSettled([
+        const [summaryRes, salaryRes, settingsRes, monthlyExpenseItemsRes] = await Promise.allSettled([
           dailyCashApi.getMonthlySummary(year, currentMonth),
           salaryApi.getAdminMonthly(year, currentMonth),
           businessSettingsApi.get(year, currentMonth),
+          reportApi.getMonthlyExpenseItems(year, currentMonth),
         ])
 
         if (summaryRes.status === 'fulfilled') {
           const summary = summaryRes.value.data || {}
+          const monthReloadByShop = monthlyExpenseItemsRes.status === 'fulfilled'
+            ? getReloadByShop(monthlyExpenseItemsRes.value.data || [])
+            : {}
           ytdSales += getMonthlyRevenue(summary)
           ytdExpenses += toNumber(summary?.overall?.totalExpenses)
-          ytdGross += getOverallProfit(summary)
+          ytdGross += getOverallProfit(summary, monthReloadByShop)
         }
 
         if (salaryRes.status === 'fulfilled') {
@@ -136,7 +156,7 @@ export default function MonthlyPage() {
   const shopData = (shopCode) => data?.shops?.find((shop) => shop.shopCode === shopCode) || {}
   const overall = data?.overall || {}
   const monthlyRevenue = getMonthlyRevenue(data || {})
-  const monthlyGrossProfit = getOverallProfit(data || {})
+  const monthlyGrossProfit = getOverallProfit(data || {}, reloadByShop)
   const monthlyFixedExpenses = getTotalFixedMonthlyExpenses(businessSettings)
   const monthlyNetProfit = monthlyGrossProfit - monthlySalary - monthlyFixedExpenses
 
@@ -147,7 +167,7 @@ export default function MonthlyPage() {
       Sales: Math.round(toNumber(shop.totalSales)),
       Expenses: Math.round(toNumber(shop.totalExpenses)),
       Credits: Math.round(toNumber(shop.totalCredits)),
-      Profit: Math.round(getShopProfit(shopCode, shop.totalSales)),
+      Profit: Math.round(getShopProfit(shopCode, shop.totalSales, reloadByShop)),
     }
   })
 
@@ -234,7 +254,7 @@ export default function MonthlyPage() {
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gross Profit</span>
               </div>
               <p className="text-2xl font-bold text-blue-700">{formatRs(monthlyGrossProfit)}</p>
-              <p className="text-xs text-gray-400 mt-1">Using configured shop profit rates</p>
+              <p className="text-xs text-gray-400 mt-1">Formula: (sales × 12%) - (reload expense × 0.4%)</p>
             </div>
             <div className="card bg-gradient-to-br from-amber-50 to-white border border-amber-100">
               <div className="flex items-center gap-2 mb-1">
@@ -252,7 +272,7 @@ export default function MonthlyPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {Object.entries(SHOP_META).map(([shopCode, { label, icon: Icon, bg }]) => {
               const shop = shopData(shopCode)
-              const shopProfit = getShopProfit(shopCode, shop.totalSales)
+              const shopProfit = getShopProfit(shopCode, shop.totalSales, reloadByShop)
               return (
                 <div key={shopCode} className="card">
                   <div className="flex items-center gap-3 mb-4">
@@ -307,7 +327,7 @@ export default function MonthlyPage() {
           </div>
 
           <p className="text-xs text-gray-400 mt-4 text-center">
-            Only closed days are included. Gross profit uses Settings profit rates, and net profit subtracts staff salary plus fixed monthly expenses.
+            Only closed days are included. Gross profit uses reload-adjusted sales formula, and net profit subtracts staff salary plus fixed monthly expenses.
           </p>
         </>
       )}

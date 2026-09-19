@@ -4,8 +4,7 @@ import { PageHeader, formatRs } from '../components/ui.jsx'
 import { useEffect, useState } from 'react'
 import { dailyCashApi } from '../services/api.js'
 import { format, subDays, addDays } from 'date-fns'
-import useBusinessSettings from '../hooks/useBusinessSettings.js'
-import { calculateCalculatedSales, calculateConfiguredProfit } from '../utils/businessSettings.js'
+import { calculateCalculatedSales, calculateReloadAdjustedProfit, getReloadExpenseAmount } from '../utils/businessSettings.js'
 
 const SHOPS = [
   { code: 'CAFE', label: 'Cafe', icon: Coffee, color: '#068A4B', bg: 'bg-[#068A4B]', lightBg: 'bg-green-50' },
@@ -17,7 +16,6 @@ export default function ShopsPage() {
   const [summaries, setSummaries] = useState({})
   const [loading, setLoading] = useState(true)
   const [selectedDate, setSelectedDate] = useState(new Date())
-  const [businessSettings] = useBusinessSettings(selectedDate)
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd')
@@ -37,6 +35,7 @@ export default function ShopsPage() {
               calculatedSales: d.totalSales,
               totalExpenses:   d.totalExpenses,
               totalCredits:    d.totalCredits,
+              reloadExpense:   getReloadExpenseAmount(d.expenses || []),
               locked: d.locked,
             }
           }
@@ -87,7 +86,7 @@ export default function ShopsPage() {
       <div className="grid grid-cols-1 gap-6">
         {SHOPS.map(({ code, label, icon: Icon, bg, lightBg, color }) => {
           const s = summaries[code] || {}
-          const profit = calculateConfiguredProfit(code, calculateCalculatedSales(s), businessSettings)
+          const profit = calculateReloadAdjustedProfit(calculateCalculatedSales(s), s.reloadExpense)
           return (
             <div key={code} className="card">
               <div className="flex items-center gap-4 mb-6">

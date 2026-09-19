@@ -132,7 +132,7 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between gap-4 mb-6">
                   <div>
                     <h2 className="font-semibold text-gray-800">Profit Rates</h2>
-                    <p className="text-sm text-gray-500 mt-1">These rates are saved once and used for dashboard, shop, monthly summary, and report profit calculations.</p>
+                    <p className="text-sm text-gray-500 mt-1">Save department margin rates for business settings records and legacy calculations.</p>
                   </div>
                   <button
                     onClick={handleSaveBusinessSettings}

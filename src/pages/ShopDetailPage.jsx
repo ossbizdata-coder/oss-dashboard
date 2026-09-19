@@ -1,4 +1,4 @@
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useSearchParams } from 'react-router-dom'
 import { useEffect, useState } from 'react'
 import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw, CreditCard, CheckCircle, Pencil, X, Check } from 'lucide-react'
 import api, { transactionApi, dailyCashApi, creditApi } from '../services/api.js'
@@ -6,8 +6,7 @@ import { PageHeader, LoadingSpinner, formatRs, EmptyState, Badge } from '../comp
 import { format, subDays, addDays } from 'date-fns'
 import { formatSLShort } from '../utils/timezone.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
-import useBusinessSettings from '../hooks/useBusinessSettings.js'
-import { calculateCalculatedSales, calculateConfiguredProfit } from '../utils/businessSettings.js'
+import { calculateCalculatedSales, calculateReloadAdjustedProfit, getReloadExpenseAmount } from '../utils/businessSettings.js'
 
 const SHOP_META = {
   CAFE: { label: 'Cafe', color: '#068A4B', bg: 'bg-[#068A4B]' },
@@ -15,12 +14,18 @@ const SHOP_META = {
   FOODHUT: { label: 'Food Hut', color: '#B65505', bg: 'bg-[#B65505]' },
 }
 
+const parseRouteDate = (value) => {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const parsed = new Date(`${value}T00:00:00`)
+  return Number.isNaN(parsed.getTime()) ? null : parsed
+}
+
 export default function ShopDetailPage() {
   const { shopCode } = useParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { isSuperAdmin } = useAuth()
   const meta = SHOP_META[shopCode?.toUpperCase()] || { label: shopCode, color: '#666', bg: 'bg-gray-500' }
-  const [selectedDate, setSelectedDate] = useState(new Date())
-  const [businessSettings] = useBusinessSettings(selectedDate)
+  const [selectedDate, setSelectedDate] = useState(() => parseRouteDate(searchParams.get('date')) || new Date())
   const [summary, setSummary] = useState(null)
   const [dailyCashId, setDailyCashId] = useState(null)
   const [transactions, setTransactions] = useState([])
@@ -35,6 +40,22 @@ export default function ShopDetailPage() {
   // we merge expenses into transactions so Transactions shows both sales and expenses
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
+
+  useEffect(() => {
+    const routeDate = parseRouteDate(searchParams.get('date'))
+    if (!routeDate) return
+    if (format(routeDate, 'yyyy-MM-dd') !== format(selectedDate, 'yyyy-MM-dd')) {
+      setSelectedDate(routeDate)
+    }
+  }, [searchParams, selectedDate])
+
+  useEffect(() => {
+    const dateStr = format(selectedDate, 'yyyy-MM-dd')
+    if (searchParams.get('date') === dateStr) return
+    const next = new URLSearchParams(searchParams)
+    next.set('date', dateStr)
+    setSearchParams(next, { replace: true })
+  }, [selectedDate, searchParams, setSearchParams])
 
   const load = async () => {
     setLoading(true)
@@ -121,7 +142,10 @@ export default function ShopDetailPage() {
 
   useEffect(() => { load() }, [shopCode, selectedDate])
 
-  const calculatedProfit = calculateConfiguredProfit(shopCode?.toUpperCase(), calculateCalculatedSales(summary), businessSettings)
+  const calculatedProfit = calculateReloadAdjustedProfit(
+    calculateCalculatedSales(summary),
+    getReloadExpenseAmount(summary?.expenses || [])
+  )
 
   const markCreditPaid = async (id) => {
     setMarkingPaid(id)
