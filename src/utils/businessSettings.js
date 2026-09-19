@@ -168,12 +168,14 @@ export function saveBusinessSettings(settings, targetDate = new Date()) {
 }
 
 export function calculateCalculatedSales(summary = {}) {
-  return Math.max(0, toNumber(summary.calculatedSales ?? summary.totalSales))
+  const safeSummary = summary && typeof summary === 'object' ? summary : {}
+  return Math.max(0, toNumber(safeSummary.calculatedSales ?? safeSummary.totalSales))
 }
 
 export function calculateRevenue(summary = {}) {
-  const calculatedSales = calculateCalculatedSales(summary)
-  const credits = Math.max(0, toNumber(summary.totalCredits))
+  const safeSummary = summary && typeof summary === 'object' ? summary : {}
+  const calculatedSales = calculateCalculatedSales(safeSummary)
+  const credits = Math.max(0, toNumber(safeSummary.totalCredits))
   return Math.max(0, calculatedSales - credits)
 }
 
