@@ -203,7 +203,9 @@ export function getReloadExpenseAmount(expenses = []) {
 export function calculateReloadAdjustedProfit(totalSales, reloadExpense) {
   const sales = Math.max(0, toNumber(totalSales))
   const reload = Math.max(0, toNumber(reloadExpense))
-  return Math.round((sales * 0.12) - (reload * 0.004))
+  const reloadSales = reload * 1.05
+  const normalSales = Math.max(0, sales - reloadSales)
+  return Math.round((normalSales * 0.12) + (reloadSales * 0.05))
 }
 
 export function getTotalFixedMonthlyExpenses(settings, targetDate = new Date()) {

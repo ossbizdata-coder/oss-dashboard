@@ -82,7 +82,8 @@ export default function DashboardPage() {
   const totalProfit = SHOPS.reduce((sum, shopCode) => sum + calcProfit(shopCode), 0)
   const totalDailyCredits = SHOPS.reduce((sum, shopCode) => sum + (shopSummaries[shopCode]?.totalCredits || 0), 0)
   const totalReloadExpense = SHOPS.reduce((sum, shopCode) => sum + (shopSummaries[shopCode]?.reloadExpense || 0), 0)
-  const reloadAdjustment = Math.round(totalReloadExpense * 0.004)
+  const reloadSalesProxy = totalReloadExpense * 1.05
+  const reloadAdjustment = Math.round(reloadSalesProxy * 0.07)
 
   const adminStaffRaw = attendance.filter((item) =>
     (item.userRole === 'ADMIN' || item.userRole === 'SUPERADMIN') &&
