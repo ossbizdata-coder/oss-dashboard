@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   TrendingUp, TrendingDown, DollarSign, CreditCard,
   Coffee, BookOpen, UtensilsCrossed, RefreshCw,
-  ChevronLeft, ChevronRight
+  ChevronLeft, ChevronRight, Wallet
 } from 'lucide-react'
 import { businessSettingsApi, dailyCashApi, salaryApi, reportApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
@@ -231,7 +231,7 @@ export default function MonthlyPage() {
         <div className="card text-center text-gray-400 py-12">No data available for this month</div>
       ) : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
             <div className="card bg-gradient-to-br from-green-50 to-white border border-green-100">
               <div className="flex items-center gap-2 mb-1">
                 <TrendingUp size={16} className="text-green-600" />
@@ -254,7 +254,15 @@ export default function MonthlyPage() {
                 <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Gross Profit</span>
               </div>
               <p className="text-2xl font-bold text-blue-700">{formatRs(monthlyGrossProfit)}</p>
-              <p className="text-xs text-gray-400 mt-1">Formula: (sales × 12%) - (reload expense × 0.4%)</p>
+              <p className="text-xs text-gray-400 mt-1">Reload-adjusted split profit</p>
+            </div>
+            <div className="card bg-gradient-to-br from-violet-50 to-white border border-violet-100">
+              <div className="flex items-center gap-2 mb-1">
+                <Wallet size={16} className="text-violet-600" />
+                <span className="text-xs font-medium text-gray-500 uppercase tracking-wide">Fixed Expenses</span>
+              </div>
+              <p className="text-2xl font-bold text-violet-700">{formatRs(monthlyFixedExpenses)}</p>
+              <p className="text-xs text-gray-400 mt-1">Monthly fixed costs</p>
             </div>
             <div className="card bg-gradient-to-br from-amber-50 to-white border border-amber-100">
               <div className="flex items-center gap-2 mb-1">
