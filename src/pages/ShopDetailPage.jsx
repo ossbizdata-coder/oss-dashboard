@@ -34,6 +34,7 @@ export default function ShopDetailPage() {
   const [loading, setLoading] = useState(true)
   const [markingPaid, setMarkingPaid] = useState(null)
   const loadRequestIdRef = useRef(0)
+  const loadTimerRef = useRef(null)
   // Override edit state
   const [editingField, setEditingField] = useState(null) // 'opening' | 'closing'
   const [editValue, setEditValue] = useState('')
@@ -154,7 +155,12 @@ export default function ShopDetailPage() {
     }
   }
 
-  useEffect(() => { load() }, [shopCode, selectedDate])
+  useEffect(() => {
+    if (loadTimerRef.current) clearTimeout(loadTimerRef.current)
+    // debounce rapid date/shop changes to avoid request bursts from fast UI interactions
+    loadTimerRef.current = setTimeout(() => { load() }, 150)
+    return () => { if (loadTimerRef.current) clearTimeout(loadTimerRef.current) }
+  }, [shopCode, selectedDate])
 
   const calculatedProfit = calculateReloadAdjustedProfit(
     calculateCalculatedSales(summary),
