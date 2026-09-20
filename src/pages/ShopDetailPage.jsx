@@ -1,5 +1,5 @@
 import { useParams, Link, useSearchParams } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw, CreditCard, CheckCircle, Pencil, X, Check } from 'lucide-react'
 import api, { transactionApi, dailyCashApi, creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, EmptyState, Badge } from '../components/ui.jsx'
@@ -33,6 +33,7 @@ export default function ShopDetailPage() {
   const [shopCredits, setShopCredits] = useState([])
   const [loading, setLoading] = useState(true)
   const [markingPaid, setMarkingPaid] = useState(null)
+  const loadRequestIdRef = useRef(0)
   // Override edit state
   const [editingField, setEditingField] = useState(null) // 'opening' | 'closing'
   const [editValue, setEditValue] = useState('')
@@ -58,7 +59,13 @@ export default function ShopDetailPage() {
   }, [selectedDate, searchParams, setSearchParams])
 
   const load = async () => {
+    const requestId = ++loadRequestIdRef.current
     setLoading(true)
+    setSummary(null)
+    setTransactions([])
+    setShopCredits([])
+    setTransactionsError(null)
+
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
     try {
       // map shop code to numeric department id if backend expects it
@@ -68,6 +75,7 @@ export default function ShopDetailPage() {
       const [s, t, c] = await Promise.allSettled([
         dailyCashApi.getSummary(shopCode, dateStr).then(r => {
           const d = r.data
+          if (requestId !== loadRequestIdRef.current) return null
           setDailyCashId(d.dailyCashId || null)
           return {
             openingBalance: d.openingCash,
@@ -84,6 +92,9 @@ export default function ShopDetailPage() {
         transactionApi.getByDate(deptParam, dateStr),
         creditApi.getByShop(shopCode, dateStr),
       ])
+
+      if (requestId !== loadRequestIdRef.current) return
+
       // Debug logging to help inspect API responses in devtools
       if (s.status === 'fulfilled') {
         console.debug('dailyCash summary response:', s.value)
@@ -92,7 +103,6 @@ export default function ShopDetailPage() {
         console.error('dailyCash summary failed:', s.reason)
       }
 
-      setTransactionsError(null)
       if (t.status === 'fulfilled') {
         console.debug('transactions response (by-date):', t.value.data)
         let tx = t.value.data || []
@@ -100,29 +110,33 @@ export default function ShopDetailPage() {
         if ((!tx || tx.length === 0) && shopCode) {
           try {
             const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr } })
+            if (requestId !== loadRequestIdRef.current) return
             console.debug('transactions response (by-shop):', alt.data)
             tx = alt.data || []
           } catch (err) {
             console.error('transactions by-shop failed:', err)
           }
         }
+        if (requestId !== loadRequestIdRef.current) return
         setTransactions(tx)
       } else {
         console.error('transactions fetch failed:', t.reason)
-        // surface 403 or other error message to the UI
         const err = t.reason
         const msg = err?.response?.data?.message || err?.response?.statusText || (err && err.message) || 'Failed to load transactions'
+        if (requestId !== loadRequestIdRef.current) return
         setTransactionsError(msg)
         // attempt fallback to by-shop when initial call failed
         if (shopCode) {
           try {
             const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr } })
+            if (requestId !== loadRequestIdRef.current) return
             console.debug('transactions response (by-shop fallback):', alt.data)
             setTransactions(alt.data || [])
             setTransactionsError(null)
           } catch (err) {
             console.error('transactions by-shop fallback failed:', err)
             const msg2 = err?.response?.data?.message || err?.response?.statusText || (err && err.message) || 'Failed to load transactions'
+            if (requestId !== loadRequestIdRef.current) return
             setTransactions([])
             setTransactionsError(msg2)
           }
@@ -131,12 +145,15 @@ export default function ShopDetailPage() {
 
       if (c.status === 'fulfilled') {
         console.debug('credits response:', c.value.data)
+        if (requestId !== loadRequestIdRef.current) return
         setShopCredits(c.value.data?.credits || [])
       } else {
         console.error('credits fetch failed:', c.reason)
       }
     } finally {
-      setLoading(false)
+      if (requestId === loadRequestIdRef.current) {
+        setLoading(false)
+      }
     }
   }
 
