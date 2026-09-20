@@ -61,9 +61,6 @@ export default function ShopDetailPage() {
   const load = async () => {
     const requestId = ++loadRequestIdRef.current
     setLoading(true)
-    setSummary(null)
-    setTransactions([])
-    setShopCredits([])
     setTransactionsError(null)
 
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
