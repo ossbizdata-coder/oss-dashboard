@@ -35,6 +35,7 @@ export default function ShopDetailPage() {
   const [markingPaid, setMarkingPaid] = useState(null)
   const loadRequestIdRef = useRef(0)
   const loadTimerRef = useRef(null)
+  const abortControllerRef = useRef(null)
   // Override edit state
   const [editingField, setEditingField] = useState(null) // 'opening' | 'closing'
   const [editValue, setEditValue] = useState('')
@@ -70,8 +71,14 @@ export default function ShopDetailPage() {
       const SHOP_IDS = { CAFE: 1, BOOKSHOP: 2, FOODHUT: 3 }
       const deptParam = SHOP_IDS[shopCode?.toUpperCase()] ?? shopCode
 
+      // Abort previous pending requests to avoid buildup
+      try { if (abortControllerRef.current) abortControllerRef.current.abort() } catch (e) { /* ignore */ }
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+
       const [s, t, c] = await Promise.allSettled([
-        dailyCashApi.getSummary(shopCode, dateStr).then(r => {
+        // daily cash summary: /daily-cash/:shopId/:date
+        api.get(`/daily-cash/${SHOP_IDS[shopCode?.toUpperCase()] || shopCode}/${dateStr}`, { signal: controller.signal }).then(r => {
           const d = r.data
           if (requestId !== loadRequestIdRef.current) return null
           setDailyCashId(d.dailyCashId || null)
@@ -86,12 +93,17 @@ export default function ShopDetailPage() {
             expenses: d.expenses || [],
           }
         }),
-        // pass department id (or fallback to shopCode) — some backends expect numeric id
-        transactionApi.getByDate(deptParam, dateStr),
-        creditApi.getByShop(shopCode, dateStr),
+        // transactions by-date
+        api.get('/transactions/by-date', { params: { department: deptParam, date: dateStr }, signal: controller.signal }),
+        // credits by shop
+        api.get('/credits/by-shop', { params: { shopCode, date: dateStr }, signal: controller.signal }),
       ])
 
-      if (requestId !== loadRequestIdRef.current) return
+      if (requestId !== loadRequestIdRef.current) {
+        // this response is outdated; ensure controller is cleaned
+        if (abortControllerRef.current === controller) abortControllerRef.current = null
+        return
+      }
 
       // Debug logging to help inspect API responses in devtools
       if (s.status === 'fulfilled') {
@@ -107,12 +119,17 @@ export default function ShopDetailPage() {
         // If backend returned no rows for by-date, try the alternate by-shop endpoint (some servers expose this)
         if ((!tx || tx.length === 0) && shopCode) {
           try {
-            const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr } })
+            const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr }, signal: controller.signal })
             if (requestId !== loadRequestIdRef.current) return
             console.debug('transactions response (by-shop):', alt.data)
             tx = alt.data || []
           } catch (err) {
-            console.error('transactions by-shop failed:', err)
+            // ignore aborts
+            if (err?.code === 'ERR_CANCELED') {
+              console.debug('transactions by-shop aborted')
+            } else {
+              console.error('transactions by-shop failed:', err)
+            }
           }
         }
         if (requestId !== loadRequestIdRef.current) return
@@ -146,11 +163,19 @@ export default function ShopDetailPage() {
         if (requestId !== loadRequestIdRef.current) return
         setShopCredits(c.value.data?.credits || [])
       } else {
-        console.error('credits fetch failed:', c.reason)
+        if (c.reason?.code === 'ERR_CANCELED') {
+          console.debug('credits fetch aborted')
+        } else {
+          console.error('credits fetch failed:', c.reason)
+        }
       }
     } finally {
       if (requestId === loadRequestIdRef.current) {
         setLoading(false)
+      }
+      // cleanup controller if it's still ours
+      if (abortControllerRef.current && abortControllerRef.current.signal && abortControllerRef.current.signal.aborted) {
+        abortControllerRef.current = null
       }
     }
   }
