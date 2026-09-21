@@ -44,18 +44,8 @@ export default function ShopDetailPage() {
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
-  const routeDateKey = searchParams.get('date')
-
-  useEffect(() => {
-    const routeDate = parseRouteDate(routeDateKey)
-    if (!routeDate) return
-
-    const selectedDateKey = format(selectedDate, 'yyyy-MM-dd')
-    if (routeDateKey !== selectedDateKey) {
-      setSelectedDate(routeDate)
-    }
-  }, [routeDateKey, selectedDate])
-
+  // Initialize selectedDate from route on first render only (state initializer already handled it)
+  // Keep the URL in sync when selectedDate changes.
   useEffect(() => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
     const currentDate = searchParams.get('date')
