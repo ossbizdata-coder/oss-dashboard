@@ -157,17 +157,17 @@ export default function Layout() {
         </header>
 
         {urgentCredits.length > 0 && (
-          <div className="border-b border-red-200 bg-red-50 px-6 py-3">
-            <div className="mx-auto flex max-w-6xl items-center gap-3 text-red-800">
-              <AlertTriangle size={18} className="shrink-0" />
+          <div className="border-b border-red-300 bg-gradient-to-r from-red-50 to-red-100 px-6 py-3 shadow-sm">
+            <div className="mx-auto flex max-w-6xl items-center gap-3 text-red-900">
+              <AlertTriangle size={18} className="shrink-0 text-red-700" />
               <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
-                  <span>Urgent action required</span>
-                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-sm font-bold text-red-900">Hi, {user?.name || 'User'}. Your attention required.</span>
+                  <span className="rounded-full bg-red-700 px-3 py-1 text-xs font-bold text-white animate-pulse">
                     {urgentCredits.length} overdue credit{urgentCredits.length > 1 ? 's' : ''}
                   </span>
                 </div>
-                <p className="text-xs text-red-700 mt-0.5">
+                <p className="text-sm text-red-800 mt-1">
                   {Object.entries(urgentDepartmentSummary)
                     .map(([department, count]) => `${department}: ${count}`)
                     .join(' • ')}
@@ -176,7 +176,7 @@ export default function Layout() {
               </div>
               <NavLink
                 to="/credits"
-                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
+                className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 transition-colors"
               >
                 View credits
               </NavLink>
