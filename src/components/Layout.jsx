@@ -2,10 +2,12 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   LayoutDashboard, Store, Users, CreditCard,
-  BarChart3, Shield, Settings, LogOut, Menu, CalendarDays, Receipt
+  BarChart3, Shield, Settings, LogOut, Menu, CalendarDays, Receipt,
+  AlertTriangle
 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import clsx from 'clsx'
+import { creditApi } from '../services/api.js'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -23,6 +25,39 @@ export default function Layout() {
   const { user, logout, isSuperAdmin } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [urgentCredits, setUrgentCredits] = useState([])
+
+  useEffect(() => {
+    let active = true
+
+    const loadUrgentAlerts = async () => {
+      try {
+        const response = await creditApi.getAll()
+        if (!active) return
+
+        const credits = Array.isArray(response?.data) ? response.data : []
+        const now = Date.now()
+        const overdue = credits.filter((credit) => {
+          if (credit?.isPaid) return false
+          if (!credit?.createdAt) return false
+
+          const createdAt = new Date(credit.createdAt).getTime()
+          if (Number.isNaN(createdAt)) return false
+
+          return (now - createdAt) >= 30 * 24 * 60 * 60 * 1000
+        })
+
+        setUrgentCredits(overdue)
+      } catch (error) {
+        if (active) setUrgentCredits([])
+      }
+    }
+
+    loadUrgentAlerts()
+    return () => {
+      active = false
+    }
+  }, [])
 
   const handleLogout = () => {
     logout()
@@ -30,6 +65,11 @@ export default function Layout() {
   }
 
   const visibleNav = navItems.filter(item => !item.superAdminOnly || isSuperAdmin)
+  const urgentDepartmentSummary = urgentCredits.reduce((summary, credit) => {
+    const department = (credit.department || 'COMMON').toUpperCase()
+    summary[department] = (summary[department] || 0) + 1
+    return summary
+  }, {})
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
@@ -115,6 +155,34 @@ export default function Layout() {
             {new Date().toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
           </span>
         </header>
+
+        {urgentCredits.length > 0 && (
+          <div className="border-b border-red-200 bg-red-50 px-6 py-3">
+            <div className="mx-auto flex max-w-6xl items-center gap-3 text-red-800">
+              <AlertTriangle size={18} className="shrink-0" />
+              <div className="flex-1 min-w-0">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold">
+                  <span>Urgent action required</span>
+                  <span className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-bold text-red-700">
+                    {urgentCredits.length} overdue credit{urgentCredits.length > 1 ? 's' : ''}
+                  </span>
+                </div>
+                <p className="text-xs text-red-700 mt-0.5">
+                  {Object.entries(urgentDepartmentSummary)
+                    .map(([department, count]) => `${department}: ${count}`)
+                    .join(' • ')}
+                  {' '}older than 30 days. Please follow up immediately.
+                </p>
+              </div>
+              <NavLink
+                to="/credits"
+                className="rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-100 transition-colors"
+              >
+                View credits
+              </NavLink>
+            </div>
+          </div>
+        )}
 
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto p-6">
