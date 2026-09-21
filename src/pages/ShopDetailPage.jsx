@@ -44,17 +44,23 @@ export default function ShopDetailPage() {
 
   const isToday = format(selectedDate, 'yyyy-MM-dd') === format(new Date(), 'yyyy-MM-dd')
 
+  const routeDateKey = searchParams.get('date')
+
   useEffect(() => {
-    const routeDate = parseRouteDate(searchParams.get('date'))
+    const routeDate = parseRouteDate(routeDateKey)
     if (!routeDate) return
-    if (format(routeDate, 'yyyy-MM-dd') !== format(selectedDate, 'yyyy-MM-dd')) {
+
+    const selectedDateKey = format(selectedDate, 'yyyy-MM-dd')
+    if (routeDateKey !== selectedDateKey) {
       setSelectedDate(routeDate)
     }
-  }, [searchParams, selectedDate])
+  }, [routeDateKey, selectedDate])
 
   useEffect(() => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd')
-    if (searchParams.get('date') === dateStr) return
+    const currentDate = searchParams.get('date')
+    if (currentDate === dateStr) return
+
     const next = new URLSearchParams(searchParams)
     next.set('date', dateStr)
     setSearchParams(next, { replace: true })
@@ -95,8 +101,16 @@ export default function ShopDetailPage() {
         }),
         // transactions by-date
         api.get('/transactions/by-date', { params: { department: deptParam, date: dateStr }, signal: controller.signal }),
-        // credits by shop
-        api.get('/credits/by-shop', { params: { shopCode, date: dateStr }, signal: controller.signal }),
+        // avoid the unsupported /credits/by-shop route; fetch all credits and filter locally by shop/date
+        creditApi.getAll().then((r) => {
+          const credits = Array.isArray(r?.data) ? r.data : []
+          const normalizedShop = shopCode?.toUpperCase()
+          return credits.filter((credit) => {
+            const creditDate = format(new Date(credit.createdAt || Date.now()), 'yyyy-MM-dd')
+            const creditShop = (credit.department || 'COMMON').toUpperCase()
+            return creditDate === dateStr && (!normalizedShop || creditShop === normalizedShop)
+          })
+        })
       ])
 
       if (requestId !== loadRequestIdRef.current) {
@@ -115,23 +129,7 @@ export default function ShopDetailPage() {
 
       if (t.status === 'fulfilled') {
         console.debug('transactions response (by-date):', t.value.data)
-        let tx = t.value.data || []
-        // If backend returned no rows for by-date, try the alternate by-shop endpoint (some servers expose this)
-        if ((!tx || tx.length === 0) && shopCode) {
-          try {
-            const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr }, signal: controller.signal })
-            if (requestId !== loadRequestIdRef.current) return
-            console.debug('transactions response (by-shop):', alt.data)
-            tx = alt.data || []
-          } catch (err) {
-            // ignore aborts
-            if (err?.code === 'ERR_CANCELED') {
-              console.debug('transactions by-shop aborted')
-            } else {
-              console.error('transactions by-shop failed:', err)
-            }
-          }
-        }
+        const tx = t.value.data || []
         if (requestId !== loadRequestIdRef.current) return
         setTransactions(tx)
       } else {
@@ -140,28 +138,13 @@ export default function ShopDetailPage() {
         const msg = err?.response?.data?.message || err?.response?.statusText || (err && err.message) || 'Failed to load transactions'
         if (requestId !== loadRequestIdRef.current) return
         setTransactionsError(msg)
-        // attempt fallback to by-shop when initial call failed
-        if (shopCode) {
-          try {
-            const alt = await api.get('transactions/by-shop', { params: { shopCode, date: dateStr } })
-            if (requestId !== loadRequestIdRef.current) return
-            console.debug('transactions response (by-shop fallback):', alt.data)
-            setTransactions(alt.data || [])
-            setTransactionsError(null)
-          } catch (err) {
-            console.error('transactions by-shop fallback failed:', err)
-            const msg2 = err?.response?.data?.message || err?.response?.statusText || (err && err.message) || 'Failed to load transactions'
-            if (requestId !== loadRequestIdRef.current) return
-            setTransactions([])
-            setTransactionsError(msg2)
-          }
-        }
+        setTransactions([])
       }
 
       if (c.status === 'fulfilled') {
-        console.debug('credits response:', c.value.data)
+        console.debug('credits response:', c.value)
         if (requestId !== loadRequestIdRef.current) return
-        setShopCredits(c.value.data?.credits || [])
+        setShopCredits(c.value || [])
       } else {
         if (c.reason?.code === 'ERR_CANCELED') {
           console.debug('credits fetch aborted')
