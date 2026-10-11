@@ -4,7 +4,7 @@ import { ChevronLeft, ChevronRight, ArrowLeft, RefreshCw, CreditCard, CheckCircl
 import api, { transactionApi, dailyCashApi, creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, EmptyState, Badge } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
-import { formatSLShort } from '../utils/timezone.js'
+import { formatSLShort, toDateKey } from '../utils/timezone.js'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { calculateCalculatedSales, calculateReloadAdjustedProfit, getReloadExpenseAmount } from '../utils/businessSettings.js'
 
@@ -91,12 +91,12 @@ export default function ShopDetailPage() {
         }),
         // transactions by-date
         api.get('/transactions/by-date', { params: { department: deptParam, date: dateStr }, signal: controller.signal }),
-        // avoid the unsupported /credits/by-shop route; fetch all credits and filter locally by shop/date
+        // use the business date for matching, not the record creation time
         creditApi.getAll().then((r) => {
           const credits = Array.isArray(r?.data) ? r.data : []
           const normalizedShop = shopCode?.toUpperCase()
           return credits.filter((credit) => {
-            const creditDate = format(new Date(credit.createdAt || Date.now()), 'yyyy-MM-dd')
+            const creditDate = toDateKey(credit.transactionDate || credit.businessDate || credit.createdAt)
             const creditShop = (credit.department || 'COMMON').toUpperCase()
             return creditDate === dateStr && (!normalizedShop || creditShop === normalizedShop)
           })

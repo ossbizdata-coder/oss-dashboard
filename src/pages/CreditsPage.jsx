@@ -4,6 +4,7 @@ import { PageHeader, LoadingSpinner, formatRs, Badge } from '../components/ui.js
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { CreditCard, CheckCircle, RefreshCw } from 'lucide-react'
 import { format } from 'date-fns'
+import { parseDateOnlyValue } from '../utils/timezone.js'
 
 export default function CreditsPage() {
   const { isSuperAdmin } = useAuth()
@@ -13,7 +14,7 @@ export default function CreditsPage() {
   const [filter, setFilter] = useState('all')
   const [shopFilter, setShopFilter] = useState('all')
   const [userFilter, setUserFilter] = useState('all')
-  const [sortColumn, setSortColumn] = useState('createdAt') // 'userName', 'amount', 'createdAt', 'isPaid'
+  const [sortColumn, setSortColumn] = useState('transactionDate') // 'userName', 'amount', 'transactionDate', 'isPaid'
   const [sortDir, setSortDir] = useState('desc') // 'asc' or 'desc'
   const [paying, setPaying] = useState(null)
 
@@ -64,8 +65,10 @@ export default function CreditsPage() {
         aVal = a.isPaid ? 1 : 0
         bVal = b.isPaid ? 1 : 0
       } else {
-        aVal = new Date(a.createdAt || 0).getTime()
-        bVal = new Date(b.createdAt || 0).getTime()
+        const aDate = parseDateOnlyValue(a.transactionDate || a.businessDate || a.createdAt)
+        const bDate = parseDateOnlyValue(b.transactionDate || b.businessDate || b.createdAt)
+        aVal = aDate ? aDate.getTime() : 0
+        bVal = bDate ? bDate.getTime() : 0
       }
       return sortDir === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : (aVal > bVal ? -1 : aVal < bVal ? 1 : 0)
     })
@@ -193,8 +196,8 @@ export default function CreditsPage() {
                       </div>
                       <p className="text-sm text-gray-500 mt-1">{c.reason || 'No reason provided'}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                        {c.transactionDate ? `Date: ${c.transactionDate}` : ''}
-                        {c.createdAt ? ` · Added ${format(new Date(c.createdAt), 'MMM d, yyyy')}` : ''}
+                       {c.transactionDate || c.businessDate ? `Date: ${c.transactionDate || c.businessDate}` : ''}
+                       {c.createdAt ? ` · Added ${format(parseDateOnlyValue(c.createdAt) || new Date(c.createdAt), 'MMM d, yyyy')}` : ''}
                       </p>
                     </div>
                     <div className="text-right shrink-0">

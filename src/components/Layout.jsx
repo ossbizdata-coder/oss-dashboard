@@ -8,6 +8,7 @@ import {
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
 import { creditApi } from '../services/api.js'
+import { parseDateOnlyValue } from '../utils/timezone.js'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
@@ -39,12 +40,15 @@ export default function Layout() {
         const now = Date.now()
         const overdue = credits.filter((credit) => {
           if (credit?.isPaid) return false
-          if (!credit?.createdAt) return false
 
-          const createdAt = new Date(credit.createdAt).getTime()
-          if (Number.isNaN(createdAt)) return false
+          const dateValue = credit?.transactionDate || credit?.businessDate || credit?.createdAt
+          const parsedDate = parseDateOnlyValue(dateValue)
+          if (!parsedDate) return false
 
-          return (now - createdAt) >= 30 * 24 * 60 * 60 * 1000
+          const timestamp = parsedDate.getTime()
+          if (Number.isNaN(timestamp)) return false
+
+          return (now - timestamp) >= 30 * 24 * 60 * 60 * 1000
         })
 
         setUrgentCredits(overdue)
