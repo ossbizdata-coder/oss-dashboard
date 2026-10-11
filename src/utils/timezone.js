@@ -5,43 +5,6 @@
 const SL_TZ = 'Asia/Colombo'
 
 /**
- * Parse a business date that may be either a plain YYYY-MM-DD string or an ISO timestamp.
- * This preserves local calendar dates instead of shifting them by timezone.
- */
-export function parseDateOnlyValue(value) {
-  if (value === null || value === undefined || value === '') return null
-
-  if (value instanceof Date) {
-    return Number.isNaN(value.getTime()) ? null : value
-  }
-
-  if (typeof value === 'number') {
-    return Number.isNaN(value) ? null : new Date(value)
-  }
-
-  const raw = String(value).trim()
-  if (!raw) return null
-
-  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) {
-    const [year, month, day] = raw.split('-').map(Number)
-    return new Date(year, month - 1, day)
-  }
-
-  const parsed = new Date(raw)
-  return Number.isNaN(parsed.getTime()) ? null : parsed
-}
-
-export function toDateKey(value) {
-  const date = parseDateOnlyValue(value)
-  if (!date) return null
-
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
-/**
  * Format a UTC date string / Instant / epoch to Sri Lanka local time.
  * Outputs: "3 May 2026, 14:35" (short format)
  */
