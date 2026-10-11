@@ -2,10 +2,10 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import {
   TrendingUp, TrendingDown, DollarSign, CreditCard,
-  Users, Coffee, BookOpen, UtensilsCrossed, RefreshCw,
+  Coffee, BookOpen, UtensilsCrossed, RefreshCw,
   ChevronLeft, ChevronRight
 } from 'lucide-react'
-import { attendanceApi, dailyCashApi } from '../services/api.js'
+import { dailyCashApi } from '../services/api.js'
 import { LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { format, subDays, addDays } from 'date-fns'
 import { calculateCalculatedSales, calculateReloadAdjustedProfit, getReloadExpenseAmount } from '../utils/businessSettings.js'
@@ -23,7 +23,6 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
   const [shopSummaries, setShopSummaries] = useState({})
-  const [attendance, setAttendance] = useState([])
   const [loadWarning, setLoadWarning] = useState('')
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
@@ -48,10 +47,9 @@ export default function DashboardPage() {
         }
       }
 
-      const [summaries, attendanceResult] = await Promise.allSettled([
-        Promise.all(SHOPS.map((shopCode) => loadOneShop(shopCode).catch(() => ({ shop: shopCode, _failed: true })))),
-        attendanceApi.getAll(),
-      ])
+      const summaries = await Promise.allSettled(
+        SHOPS.map((shopCode) => loadOneShop(shopCode).catch(() => ({ shop: shopCode, _failed: true })))
+      )
 
       if (summaries.status === 'fulfilled') {
         const map = {}
@@ -59,10 +57,6 @@ export default function DashboardPage() {
         setShopSummaries(map)
         const failed = summaries.value.filter((summary) => summary._failed).length
         if (failed > 0) setLoadWarning(`Some shop totals could not be loaded for ${dateStr}.`)
-      }
-
-      if (attendanceResult.status === 'fulfilled') {
-        setAttendance(attendanceResult.value?.data || [])
       }
     } finally {
       setLoading(false)
@@ -84,21 +78,6 @@ export default function DashboardPage() {
   const totalReloadExpense = SHOPS.reduce((sum, shopCode) => sum + (shopSummaries[shopCode]?.reloadExpense || 0), 0)
   const reloadSalesProxy = totalReloadExpense * 1.05
   const reloadAdjustment = Math.round(reloadSalesProxy * 0.07)
-
-  const adminStaffRaw = attendance.filter((item) =>
-    (item.userRole === 'ADMIN' || item.userRole === 'SUPERADMIN') &&
-    item.workDate === dateStr
-  )
-
-  const seenUsers = new Set()
-  const adminStaff = adminStaffRaw.filter((item) => {
-    const key = item.userId ?? item.userEmail ?? item.userName
-    if (seenUsers.has(key)) return false
-    seenUsers.add(key)
-    return true
-  })
-
-  const workingToday = adminStaff.filter((item) => item.status === 'WORKING' || item.isWorking === true).length
 
   return (
     <div>
@@ -256,15 +235,6 @@ export default function DashboardPage() {
             })}
           </div>
 
-          <div className="card max-w-xl py-4">
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <Users size={16} className="text-gray-500" />
-                <h2 className="text-sm font-semibold text-gray-700">Working Staff Today</h2>
-              </div>
-              <div className="text-2xl font-bold text-primary-700">{workingToday}</div>
-            </div>
-          </div>
         </>
       )}
     </div>
