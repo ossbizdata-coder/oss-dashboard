@@ -48,16 +48,21 @@ export default function DashboardPage() {
       }
 
       const summaries = await Promise.allSettled(
-        SHOPS.map((shopCode) => loadOneShop(shopCode).catch(() => ({ shop: shopCode, _failed: true })))
+        SHOPS.map((shopCode) => loadOneShop(shopCode))
       )
 
-      if (summaries.status === 'fulfilled') {
-        const map = {}
-        summaries.value.forEach((summary) => { map[summary.shop] = summary })
-        setShopSummaries(map)
-        const failed = summaries.value.filter((summary) => summary._failed).length
-        if (failed > 0) setLoadWarning(`Some shop totals could not be loaded for ${dateStr}.`)
-      }
+      const map = {}
+      let failed = 0
+      summaries.forEach((result, index) => {
+        const shopCode = SHOPS[index]
+        if (result.status === 'fulfilled') {
+          map[shopCode] = result.value
+        } else {
+          failed += 1
+        }
+      })
+      setShopSummaries(map)
+      if (failed > 0) setLoadWarning(`Some shop totals could not be loaded for ${dateStr}.`)
     } finally {
       setLoading(false)
     }
