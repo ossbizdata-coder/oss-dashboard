@@ -335,7 +335,7 @@ export default function MonthlyPage() {
           </div>
 
           <p className="text-xs text-gray-400 mt-4 text-center">
-            Only closed days are included. Gross profit uses reload-adjusted sales formula, and net profit subtracts staff salary plus fixed monthly expenses.
+            Monthly totals are aggregated from date-range transactions. Gross profit uses reload-adjusted sales formula, and net profit subtracts staff salary plus fixed monthly expenses.
           </p>
         </>
       )}
