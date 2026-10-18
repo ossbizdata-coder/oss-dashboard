@@ -83,7 +83,22 @@ export default function StaffPage() {
   }
 
   const getRowDays = (s) => toNumber(s.workDays ?? s.daysWorked ?? s.workingDays ?? s.totalWorkDays ?? s.days ?? 0)
-  const getRowGross = (s) => getRowDays(s) > 0 ? toNumber(s.totalSalary ?? s.grossSalary ?? s.baseSalary ?? 0) : 0
+  const getRowHourlyRate = (s) => {
+    const explicit = toNumber(s.hourlyRate ?? s.hourly_rate ?? 0)
+    if (explicit > 0) return explicit
+    const daily = toNumber(s.dailyRate ?? s.dailySalary ?? 0)
+    return daily > 0 ? daily / 8.0 : 0
+  }
+  const getRowDeductionRate = (s) => toNumber(s.deductionRatePerHour ?? s.deductionRate ?? s.deduction_rate_per_hour ?? getRowHourlyRate(s))
+  const getRowOvertimeHours = (s) => toNumber(s.totalOvertimeHours ?? s.overtimeHours ?? s.otHours ?? 0)
+  const getRowDeductionHours = (s) => toNumber(s.totalDeductionHours ?? s.deductionHours ?? s.offWorkHours ?? 0)
+  const getRowOvertimeAmount = (s) => getRowOvertimeHours(s) * getRowHourlyRate(s)
+  const getRowDeductionAmount = (s) => getRowDeductionHours(s) * getRowDeductionRate(s)
+  const getRowGross = (s) => {
+    const directGross = toNumber(s.baseSalary ?? s.grossSalary ?? 0)
+    const computedGross = directGross + getRowOvertimeAmount(s) - getRowDeductionAmount(s)
+    return getRowDays(s) > 0 ? Math.max(computedGross, 0) : 0
+  }
   const getRowNet = (s) => {
     const gross = getRowGross(s)
     return gross > 0 ? Math.max(gross - getCredits(s), 0) : 0
@@ -200,13 +215,23 @@ export default function StaffPage() {
             <div className="card overflow-x-auto p-0 shadow-sm border-gray-100">
               <table className="w-full text-sm text-left border-collapse">
                 <thead className="bg-gray-50 text-gray-500 border-b border-gray-100 font-bold uppercase">
-                  <tr><th className="p-4 cursor-pointer hover:text-primary-700" onClick={() => { setSalarySortCol('name'); setSalarySortDir(salarySortDir === 'asc' ? 'desc' : 'asc') }}>Staff Member</th><th className="p-4 text-right">Work Days</th><th className="p-4 text-right">Gross Salary</th><th className="p-4 text-right text-red-600">Credits</th><th className="p-4 text-right text-primary-700 font-bold border-l border-gray-100 bg-primary-50/5">Net Pay</th></tr>
+                  <tr>
+                    <th className="p-4 cursor-pointer hover:text-primary-700" onClick={() => { setSalarySortCol('name'); setSalarySortDir(salarySortDir === 'asc' ? 'desc' : 'asc') }}>Staff Member</th>
+                    <th className="p-4 text-right">Work Days</th>
+                    <th className="p-4 text-right text-blue-600">OT</th>
+                    <th className="p-4 text-right text-purple-600">Off Work</th>
+                    <th className="p-4 text-right">Gross Salary</th>
+                    <th className="p-4 text-right text-red-600">Credits</th>
+                    <th className="p-4 text-right text-primary-700 font-bold border-l border-gray-100 bg-primary-50/5">Net Pay</th>
+                  </tr>
                 </thead>
                 <tbody>
                   {sortedSalaries.map((s, i) => (
                     <tr key={i} className="border-b last:border-0 border-gray-50 hover:bg-blue-50/20 transition-colors">
                       <td className="p-4"><p className="font-bold text-gray-800">{getSalaryName(s)}</p><p className="text-[10px] text-gray-400 uppercase tracking-tighter">{s.userRole || s.role || 'Staff Member'}</p></td>
                       <td className="p-4 text-right text-gray-600 font-bold">{getRowDays(s)}</td>
+                      <td className="p-4 text-right text-blue-600 font-medium">{formatRs(getRowOvertimeAmount(s))}</td>
+                      <td className="p-4 text-right text-purple-600 font-medium">{formatRs(getRowDeductionAmount(s))}</td>
                       <td className="p-4 text-right text-gray-600 font-medium">{formatRs(getRowGross(s))}</td>
                       <td className="p-4 text-right text-red-600 font-bold">{getCredits(s) > 0 ? `-${formatRs(getCredits(s))}` : <span className="text-gray-300">—</span>}</td>
                       <td className="p-4 text-right font-bold text-primary-700 bg-primary-50/10 border-l border-gray-100">{formatRs(getRowNet(s))}</td>
