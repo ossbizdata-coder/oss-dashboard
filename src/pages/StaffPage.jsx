@@ -3,7 +3,7 @@ import { attendanceApi, salaryApi, creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, EmptyState } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { Users, DollarSign, ChevronLeft, ChevronRight, RefreshCw, Clock, MapPin, ChevronDown, ChevronUp, UserCheck, UserX } from 'lucide-react'
-import { format, startOfMonth, subMonths, addMonths, eachDayOfInterval, endOfMonth, isSameMonth, isAfter, startOfDay } from 'date-fns'
+import { format, startOfMonth, subMonths, addMonths, isSameMonth } from 'date-fns'
 
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
@@ -84,12 +84,7 @@ export default function StaffPage() {
 
   const getRowDays = (s) => toNumber(s.workDays ?? s.daysWorked ?? s.workingDays ?? s.totalWorkDays ?? s.days ?? 0)
   const getRowDailyRate = (s) => toNumber(s.dailyRate ?? s.dailySalary ?? 0)
-  const getRowHourlyRate = (s) => {
-    const explicit = toNumber(s.hourlyRate ?? s.hourly_rate ?? 0)
-    if (explicit > 0) return explicit
-    const daily = getRowDailyRate(s)
-    return daily > 0 ? daily / 8.0 : 0
-  }
+  const getRowHourlyRate = (s) => toNumber(s.hourlyRate ?? s.hourly_rate ?? 0)
   const getRowDeductionRate = (s) => toNumber(s.deductionRatePerHour ?? s.deductionRate ?? s.deduction_rate_per_hour ?? getRowHourlyRate(s))
   const getRowOvertimeHours = (s) => toNumber(s.totalOvertimeHours ?? s.overtimeHours ?? s.otHours ?? 0)
   const getRowDeductionHours = (s) => toNumber(s.totalDeductionHours ?? s.deductionHours ?? s.offWorkHours ?? 0)
@@ -120,12 +115,13 @@ export default function StaffPage() {
     return aVal < bVal ? -factor : aVal > bVal ? factor : 0
   })
 
-  const daysInMonth = eachDayOfInterval({
-    start: startOfMonth(selectedMonth),
-    end: endOfMonth(selectedMonth)
-  }).reverse()
+  const monthPrefix = format(selectedMonth, 'yyyy-MM')
+  const monthlyAttendance = attendance.filter((row) => {
+    const dateValue = String(row.workDate || row.date || '')
+    return dateValue.startsWith(monthPrefix)
+  })
 
-  const groupedAttendance = [...attendance].reduce((acc, row) => {
+  const groupedAttendance = [...monthlyAttendance].reduce((acc, row) => {
     const userId = row.userId ?? row.user?.id ?? row.id
     const userName = row.userName || row.user?.name || 'Unknown'
     const key = `user_${userId ?? userName}`
@@ -142,7 +138,15 @@ export default function StaffPage() {
     return acc
   }, {})
 
-  const sortedGroupedAttendance = Object.values(groupedAttendance).sort((a, b) => normalize(a.userName).localeCompare(normalize(b.userName)))
+  const sortedGroupedAttendance = Object.values(groupedAttendance)
+    .map((group) => ({
+      ...group,
+      records: group.records
+        .filter((row) => row.status === 'WORKING' || row.isWorking === true)
+        .sort((a, b) => String(b.workDate || b.date || '').localeCompare(String(a.workDate || a.date || '')))
+    }))
+    .filter((group) => group.records.length > 0)
+    .sort((a, b) => normalize(a.userName).localeCompare(normalize(b.userName)))
 
   const toggleUser = (key) => {
     setExpandedUsers(prev => ({ ...prev, [key]: !prev[key] }))
@@ -172,7 +176,6 @@ export default function StaffPage() {
         tab === 'attendance' ? (
           <div className="space-y-3">
             {sortedGroupedAttendance.map((group) => {
-              const workingDates = group.records.filter(row => row.status === 'WORKING' || row.isWorking === true)
               const isExpanded = !!expandedUsers[group.key]
 
               return (
@@ -189,18 +192,18 @@ export default function StaffPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold">{workingDates.length} working days</span>
+                      <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold">{group.records.length} working days</span>
                       {isExpanded ? <ChevronUp size={18} className="text-primary-600"/> : <ChevronDown size={18} className="text-gray-400"/>}
                     </div>
                   </button>
 
                   {isExpanded && (
                     <div className="border-t border-gray-100 bg-gray-50/50 p-4">
-                      {workingDates.length === 0 ? (
+                      {group.records.length === 0 ? (
                        <p className="text-sm text-gray-400 italic text-center py-2">No working dates found for this user.</p>
                       ) : (
                        <div className="space-y-3">
-                         {workingDates.map((row, idx) => {
+                         {group.records.map((row, idx) => {
                            const dateValue = row.workDate || row.date || 'Unknown'
                            const overtimeHours = toNumber(row.overtimeHours ?? row.otHours ?? 0)
                            const deductionHours = toNumber(row.deductionHours ?? row.offWorkHours ?? row.offOfficeHours ?? row.outsideHours ?? 0)
