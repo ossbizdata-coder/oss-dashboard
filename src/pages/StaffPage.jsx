@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { attendanceApi, salaryApi, creditApi } from '../services/api.js'
+import { attendanceApi, salaryApi, creditApi, userApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, EmptyState } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
 import { Users, DollarSign, ChevronLeft, ChevronRight, RefreshCw, Clock, MapPin, ChevronDown, ChevronUp, UserCheck, UserX } from 'lucide-react'
@@ -21,6 +21,7 @@ export default function StaffPage() {
   const [attendance, setAttendance]         = useState([])
   const [monthlySalaries, setMonthlySalaries] = useState([])
   const [creditsMap, setCreditsMap]         = useState({})
+  const [userRatesMap, setUserRatesMap]     = useState({})
   const [loading, setLoading]               = useState(true)
   const [selectedMonth, setSelectedMonth]   = useState(startOfMonth(new Date()))
   const [salarySortCol, setSalarySortCol]   = useState('name')
@@ -35,10 +36,11 @@ export default function StaffPage() {
     setLoading(true)
     try {
       const salaryPromise = isSuperAdmin ? salaryApi.getAdminMonthly(year, month) : Promise.resolve({ data: [] })
-      const [att, sal, creds] = await Promise.allSettled([
+      const [att, sal, creds, users] = await Promise.allSettled([
         attendanceApi.getAll(),
         salaryPromise,
-        creditApi.getAll()
+        creditApi.getAll(),
+        userApi.getAll()
       ])
 
       if (att.status === 'fulfilled') setAttendance(att.value.data || [])
@@ -63,6 +65,22 @@ export default function StaffPage() {
         }
         setCreditsMap(mapping)
       }
+
+      if (users.status === 'fulfilled') {
+        const list = users.value.data?.data || users.value.data || []
+        const map = {}
+        if (Array.isArray(list)) {
+          list.forEach((u) => {
+            if (!u?.id) return
+            map[u.id] = {
+              dailySalary: toNumber(u.dailySalary ?? u.daily_salary ?? 0),
+              hourlyRate: toNumber(u.hourlyRate ?? u.hourly_rate ?? 0),
+              deductionRatePerHour: toNumber(u.deductionRatePerHour ?? u.deduction_rate_per_hour ?? 0)
+            }
+          })
+        }
+        setUserRatesMap(map)
+      }
     } catch (err) {
       console.error(err)
     } finally {
@@ -82,10 +100,26 @@ export default function StaffPage() {
     return toNumber(row.unpaidCredits ?? row.creditsOwed ?? row.credits)
   }
 
+  const getRowUserId = (s) => s.userId || s.user?.id || s.id
   const getRowDays = (s) => toNumber(s.workDays ?? s.daysWorked ?? s.workingDays ?? s.totalWorkDays ?? s.days ?? 0)
-  const getRowDailyRate = (s) => toNumber(s.dailyRate ?? s.dailySalary ?? 0)
-  const getRowHourlyRate = (s) => toNumber(s.hourlyRate ?? s.hourly_rate ?? 0)
-  const getRowDeductionRate = (s) => toNumber(s.deductionRatePerHour ?? s.deductionRate ?? s.deduction_rate_per_hour ?? getRowHourlyRate(s))
+  const getRowDailyRate = (s) => {
+    const explicit = toNumber(s.dailyRate ?? s.dailySalary ?? 0)
+    if (explicit > 0) return explicit
+    const userRate = toNumber(userRatesMap[getRowUserId(s)]?.dailySalary ?? 0)
+    return userRate
+  }
+  const getRowHourlyRate = (s) => {
+    const explicit = toNumber(s.hourlyRate ?? s.hourly_rate ?? 0)
+    if (explicit > 0) return explicit
+    const userRate = toNumber(userRatesMap[getRowUserId(s)]?.hourlyRate ?? 0)
+    return userRate
+  }
+  const getRowDeductionRate = (s) => {
+    const explicit = toNumber(s.deductionRatePerHour ?? s.deductionRate ?? s.deduction_rate_per_hour ?? 0)
+    if (explicit > 0) return explicit
+    const userRate = toNumber(userRatesMap[getRowUserId(s)]?.deductionRatePerHour ?? 0)
+    return userRate > 0 ? userRate : getRowHourlyRate(s)
+  }
   const getRowOvertimeHours = (s) => toNumber(s.totalOvertimeHours ?? s.overtimeHours ?? s.otHours ?? 0)
   const getRowDeductionHours = (s) => toNumber(s.totalDeductionHours ?? s.deductionHours ?? s.offWorkHours ?? 0)
   const getRowBaseSalary = (s) => {
