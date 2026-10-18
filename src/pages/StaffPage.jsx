@@ -269,8 +269,12 @@ export default function StaffPage() {
                       <td className="p-4"><p className="font-bold text-gray-800">{getSalaryName(s)}</p><p className="text-[10px] text-gray-400 uppercase tracking-tighter">{s.userRole || s.role || 'Staff Member'}</p></td>
                       <td className="p-4 text-right text-gray-600 font-bold">{getRowDays(s)}</td>
                       <td className="p-4 text-right text-gray-700 font-medium">{formatRs(getRowBaseSalary(s))}</td>
-                      <td className="p-4 text-right text-blue-600 font-medium">{formatRs(getRowOvertimeAmount(s))}</td>
-                      <td className="p-4 text-right text-purple-600 font-medium">{formatRs(getRowDeductionAmount(s))}</td>
+                      <td className="p-4 text-right text-blue-600 font-medium">
+                        {formatRs(getRowOvertimeAmount(s))} <span className="text-xs text-blue-500">({getRowOvertimeHours(s)}h)</span>
+                      </td>
+                      <td className="p-4 text-right text-purple-600 font-medium">
+                        {formatRs(getRowDeductionAmount(s))} <span className="text-xs text-purple-500">({getRowDeductionHours(s)}h)</span>
+                      </td>
                       <td className="p-4 text-right text-gray-600 font-medium">{formatRs(getRowGross(s))}</td>
                       <td className="p-4 text-right text-red-600 font-bold">{getCredits(s) > 0 ? `-${formatRs(getCredits(s))}` : <span className="text-gray-300">—</span>}</td>
                       <td className="p-4 text-right font-bold text-primary-700 bg-primary-50/10 border-l border-gray-100">{formatRs(getRowNet(s))}</td>
