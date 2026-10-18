@@ -25,7 +25,7 @@ export default function StaffPage() {
   const [selectedMonth, setSelectedMonth]   = useState(startOfMonth(new Date()))
   const [salarySortCol, setSalarySortCol]   = useState('name')
   const [salarySortDir, setSalarySortDir]   = useState('asc')
-  const [expandedDays, setExpandedDays]     = useState({})
+  const [expandedUsers, setExpandedUsers]   = useState({})
 
   const year  = selectedMonth.getFullYear()
   const month = selectedMonth.getMonth() + 1
@@ -83,21 +83,26 @@ export default function StaffPage() {
   }
 
   const getRowDays = (s) => toNumber(s.workDays ?? s.daysWorked ?? s.workingDays ?? s.totalWorkDays ?? s.days ?? 0)
+  const getRowDailyRate = (s) => toNumber(s.dailyRate ?? s.dailySalary ?? 0)
   const getRowHourlyRate = (s) => {
     const explicit = toNumber(s.hourlyRate ?? s.hourly_rate ?? 0)
     if (explicit > 0) return explicit
-    const daily = toNumber(s.dailyRate ?? s.dailySalary ?? 0)
+    const daily = getRowDailyRate(s)
     return daily > 0 ? daily / 8.0 : 0
   }
   const getRowDeductionRate = (s) => toNumber(s.deductionRatePerHour ?? s.deductionRate ?? s.deduction_rate_per_hour ?? getRowHourlyRate(s))
   const getRowOvertimeHours = (s) => toNumber(s.totalOvertimeHours ?? s.overtimeHours ?? s.otHours ?? 0)
   const getRowDeductionHours = (s) => toNumber(s.totalDeductionHours ?? s.deductionHours ?? s.offWorkHours ?? 0)
+  const getRowBaseSalary = (s) => {
+    const base = toNumber(s.baseSalary ?? 0)
+    const derived = getRowDailyRate(s) * getRowDays(s)
+    return getRowDays(s) > 0 ? Math.max(base > 0 ? base : derived, 0) : 0
+  }
   const getRowOvertimeAmount = (s) => getRowOvertimeHours(s) * getRowHourlyRate(s)
   const getRowDeductionAmount = (s) => getRowDeductionHours(s) * getRowDeductionRate(s)
   const getRowGross = (s) => {
-    const directGross = toNumber(s.baseSalary ?? s.grossSalary ?? 0)
-    const computedGross = directGross + getRowOvertimeAmount(s) - getRowDeductionAmount(s)
-    return getRowDays(s) > 0 ? Math.max(computedGross, 0) : 0
+    const gross = getRowBaseSalary(s) + getRowOvertimeAmount(s) - getRowDeductionAmount(s)
+    return getRowDays(s) > 0 ? Math.max(gross, 0) : 0
   }
   const getRowNet = (s) => {
     const gross = getRowGross(s)
@@ -120,8 +125,27 @@ export default function StaffPage() {
     end: endOfMonth(selectedMonth)
   }).reverse()
 
-  const toggleDay = (dateStr) => {
-    setExpandedDays(prev => ({ ...prev, [dateStr]: !prev[dateStr] }))
+  const groupedAttendance = [...attendance].reduce((acc, row) => {
+    const userId = row.userId ?? row.user?.id ?? row.id
+    const userName = row.userName || row.user?.name || 'Unknown'
+    const key = `user_${userId ?? userName}`
+    if (!acc[key]) {
+      acc[key] = {
+        key,
+        userId,
+        userName,
+        userRole: row.userRole || row.role || 'Staff Member',
+        records: []
+      }
+    }
+    acc[key].records.push(row)
+    return acc
+  }, {})
+
+  const sortedGroupedAttendance = Object.values(groupedAttendance).sort((a, b) => normalize(a.userName).localeCompare(normalize(b.userName)))
+
+  const toggleUser = (key) => {
+    setExpandedUsers(prev => ({ ...prev, [key]: !prev[key] }))
   }
 
   return (
@@ -147,56 +171,69 @@ export default function StaffPage() {
       {loading ? <LoadingSpinner /> : (
         tab === 'attendance' ? (
           <div className="space-y-3">
-            {daysInMonth.map(day => {
-              const dStr = format(day, 'yyyy-MM-dd')
-              const dayAttendance = attendance.filter(a => a.workDate === dStr)
-              const workingStaff = dayAttendance.filter(s => s.status === 'WORKING')
-              const isExpanded = expandedDays[dStr]
-
-              if (dayAttendance.length === 0 && isAfter(startOfDay(day), startOfDay(new Date()))) return null
+            {sortedGroupedAttendance.map((group) => {
+              const workingDates = group.records.filter(row => row.status === 'WORKING' || row.isWorking === true)
+              const isExpanded = !!expandedUsers[group.key]
 
               return (
-                <div key={dStr} className="card p-0 overflow-hidden border-gray-100 shadow-sm transition-all bg-white">
-                  <div
-                    onClick={() => toggleDay(dStr)}
-                    className="w-full flex items-center justify-between p-4 cursor-pointer hover:bg-gray-50 transition-colors"
+                <div key={group.key} className="card p-0 overflow-hidden border-gray-100 shadow-sm transition-all bg-white">
+                  <button
+                    onClick={() => toggleUser(group.key)}
+                    className="w-full flex items-center justify-between p-4 text-left hover:bg-gray-50 transition-colors"
                   >
-                    <div className="flex items-center gap-4 text-left">
-                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center font-bold ${workingStaff.length > 0 ? 'bg-green-50 text-green-700' : 'bg-gray-50 text-gray-400'}`}>{format(day, 'dd')}</div>
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center bg-blue-50 text-blue-700 font-bold">{group.userName.split(' ').map(part => part[0]).join('').slice(0,2).toUpperCase() || 'U'}</div>
                       <div>
-                        <p className="font-bold text-gray-800">{format(day, 'EEEE, MMM do')}</p>
-                        <p className="text-xs text-gray-500 font-medium">{workingStaff.length} Staff Available</p>
+                       <p className="font-bold text-gray-800">{group.userName}</p>
+                       <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{group.userRole}</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                       {isExpanded ? <ChevronUp size={20} className="text-primary-600"/> : <ChevronDown size={20} className="text-gray-400"/>}
+                    <div className="flex items-center gap-3">
+                      <span className="bg-green-50 text-green-700 px-2.5 py-1 rounded-full text-xs font-bold">{workingDates.length} working days</span>
+                      {isExpanded ? <ChevronUp size={18} className="text-primary-600"/> : <ChevronDown size={18} className="text-gray-400"/>}
                     </div>
-                  </div>
+                  </button>
 
                   {isExpanded && (
                     <div className="border-t border-gray-100 bg-gray-50/50 p-4">
-                      {dayAttendance.length === 0 ? <p className="text-sm text-gray-400 italic text-center py-2">No records for this day.</p> : (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                          {dayAttendance.map((s, i) => (
-                            <div key={i} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm flex items-center justify-between">
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2">
-                                  <p className="font-bold text-gray-800 text-sm truncate">{s.userName}</p>
-                                  {s.status === 'WORKING' ? <UserCheck size={14} className="text-green-500"/> : <UserX size={14} className="text-red-400"/>}
-                                </div>
-                                <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase mt-1 inline-block ${s.status === 'WORKING' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>{s.status}</span>
-                              </div>
-                              <div className="text-right space-y-1">
-                                <div className="flex items-center gap-1.5 text-blue-600 font-bold text-[11px] justify-end bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
-                                  <Clock size={12}/> OT: {toNumber(s.overtimeHours || s.otHours)}h
-                                </div>
-                                <div className="flex items-center gap-1.5 text-purple-600 font-bold text-[11px] justify-end bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100">
-                                  <MapPin size={12}/> OFF: {toNumber(s.offOfficeHours || s.outsideHours)}h
-                                </div>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      {workingDates.length === 0 ? (
+                       <p className="text-sm text-gray-400 italic text-center py-2">No working dates found for this user.</p>
+                      ) : (
+                       <div className="space-y-3">
+                         {workingDates.map((row, idx) => {
+                           const dateValue = row.workDate || row.date || 'Unknown'
+                           const overtimeHours = toNumber(row.overtimeHours ?? row.otHours ?? 0)
+                           const deductionHours = toNumber(row.deductionHours ?? row.offWorkHours ?? row.offOfficeHours ?? row.outsideHours ?? 0)
+
+                           return (
+                             <div key={`${group.key}-${idx}`} className="bg-white p-3 rounded-2xl border border-gray-100 shadow-sm">
+                               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                                 <div>
+                                   <p className="font-bold text-gray-800">{dateValue}</p>
+                                   <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold uppercase inline-block ${row.status === 'WORKING' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                     {row.status || (row.isWorking ? 'WORKING' : 'NOT_WORKING')}
+                                   </span>
+                                 </div>
+                                 <div className="flex items-center gap-2 text-right">
+                                   <div className="flex items-center gap-1.5 text-blue-600 font-bold text-[11px] justify-end bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">
+                                     <Clock size={12}/> OT: {overtimeHours}h
+                                   </div>
+                                   <div className="flex items-center gap-1.5 text-purple-600 font-bold text-[11px] justify-end bg-purple-50 px-2 py-0.5 rounded-lg border border-purple-100">
+                                     <MapPin size={12}/> OFF: {deductionHours}h
+                                   </div>
+                                 </div>
+                               </div>
+
+                               {(row.overtimeReason || row.deductionReason) && (
+                                 <div className="mt-2 text-xs text-gray-500 space-y-1">
+                                   {row.overtimeReason && <div><span className="font-semibold text-blue-600">OT:</span> {row.overtimeReason}</div>}
+                                   {row.deductionReason && <div><span className="font-semibold text-purple-600">Off work:</span> {row.deductionReason}</div>}
+                                 </div>
+                               )}
+                             </div>
+                           )
+                         })}
+                       </div>
                       )}
                     </div>
                   )}
@@ -218,9 +255,10 @@ export default function StaffPage() {
                   <tr>
                     <th className="p-4 cursor-pointer hover:text-primary-700" onClick={() => { setSalarySortCol('name'); setSalarySortDir(salarySortDir === 'asc' ? 'desc' : 'asc') }}>Staff Member</th>
                     <th className="p-4 text-right">Work Days</th>
+                    <th className="p-4 text-right text-gray-700">Base</th>
                     <th className="p-4 text-right text-blue-600">OT</th>
-                    <th className="p-4 text-right text-purple-600">Off Work</th>
-                    <th className="p-4 text-right">Gross Salary</th>
+                    <th className="p-4 text-right text-purple-600">Deductions</th>
+                    <th className="p-4 text-right">Gross</th>
                     <th className="p-4 text-right text-red-600">Credits</th>
                     <th className="p-4 text-right text-primary-700 font-bold border-l border-gray-100 bg-primary-50/5">Net Pay</th>
                   </tr>
@@ -230,6 +268,7 @@ export default function StaffPage() {
                     <tr key={i} className="border-b last:border-0 border-gray-50 hover:bg-blue-50/20 transition-colors">
                       <td className="p-4"><p className="font-bold text-gray-800">{getSalaryName(s)}</p><p className="text-[10px] text-gray-400 uppercase tracking-tighter">{s.userRole || s.role || 'Staff Member'}</p></td>
                       <td className="p-4 text-right text-gray-600 font-bold">{getRowDays(s)}</td>
+                      <td className="p-4 text-right text-gray-700 font-medium">{formatRs(getRowBaseSalary(s))}</td>
                       <td className="p-4 text-right text-blue-600 font-medium">{formatRs(getRowOvertimeAmount(s))}</td>
                       <td className="p-4 text-right text-purple-600 font-medium">{formatRs(getRowDeductionAmount(s))}</td>
                       <td className="p-4 text-right text-gray-600 font-medium">{formatRs(getRowGross(s))}</td>
