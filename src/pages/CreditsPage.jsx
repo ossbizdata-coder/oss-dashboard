@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { creditApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs, Badge } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -7,6 +8,7 @@ import { format } from 'date-fns'
 
 export default function CreditsPage() {
   const { isSuperAdmin } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [credits, setCredits] = useState([])
   const [unpaidTotal, setUnpaidTotal] = useState(0)
   const [loading, setLoading] = useState(true)
@@ -26,6 +28,16 @@ export default function CreditsPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  useEffect(() => {
+    const status = String(searchParams.get('status') || '').toLowerCase()
+    if (!['all', 'paid', 'unpaid'].includes(status)) return
+    setFilter(status)
+
+    const nextParams = new URLSearchParams(searchParams)
+    nextParams.delete('status')
+    setSearchParams(nextParams, { replace: true })
+  }, [searchParams, setSearchParams])
 
   const markPaid = async (id) => {
     setPaying(id)

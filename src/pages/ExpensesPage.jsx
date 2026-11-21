@@ -15,7 +15,7 @@ const SHOPS = [
 
 export default function ExpensesPage() {
   const { isSuperAdmin } = useAuth()
-  const [selectedDate, setSelectedDate] = useState(new Date())
+  const [dailyDate, setDailyDate] = useState(new Date())
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [shopData, setShopData] = useState({})
   const [expenseTypes, setExpenseTypes] = useState([])
@@ -29,7 +29,7 @@ export default function ExpensesPage() {
   const [deleteConfirm, setDeleteConfirm] = useState(null)
   const [deleting, setDeleting] = useState(null)
 
-  const dateStr = format(selectedDate, 'yyyy-MM-dd')
+  const dateStr = format(dailyDate, 'yyyy-MM-dd')
   const isToday = dateStr === format(new Date(), 'yyyy-MM-dd')
   const [selectedYear, selectedMonthValue] = selectedMonth.split('-').map(Number)
 
@@ -171,33 +171,12 @@ export default function ExpensesPage() {
         subtitle="Monthly and daily expenses across all shops"
         action={(
           <>
-            <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
-              <button onClick={() => setSelectedDate(d => subDays(d, 1))}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
-                <ChevronLeft size={16} />
-              </button>
-              <input
-                type="date"
-                value={dateStr}
-                max={format(new Date(), 'yyyy-MM-dd')}
-                onChange={event => event.target.value && setSelectedDate(new Date(event.target.value + 'T00:00:00'))}
-                className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
-              />
-              <button onClick={() => setSelectedDate(d => addDays(d, 1))} disabled={isToday}
-                className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
-                <ChevronRight size={16} />
-              </button>
-            </div>
             <input
               type="month"
               value={selectedMonth}
               onChange={(event) => setSelectedMonth(event.target.value)}
               className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-primary-400"
             />
-            <button onClick={() => setSelectedDate(new Date())}
-              className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
-              Today
-            </button>
             <button onClick={refreshAll} className="btn-outline flex items-center gap-2 text-sm">
               <RefreshCw size={14} /> Refresh
             </button>
@@ -271,6 +250,29 @@ export default function ExpensesPage() {
         <div>
           <h2 className="text-base font-semibold text-gray-800">Daily Expenses</h2>
           <p className="text-sm text-gray-500">Expenses for the selected day across all shops.</p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
+            <button onClick={() => setDailyDate((value) => subDays(value, 1))}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors">
+              <ChevronLeft size={16} />
+            </button>
+            <input
+              type="date"
+              value={dateStr}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              onChange={(event) => event.target.value && setDailyDate(new Date(event.target.value + 'T00:00:00'))}
+              className="text-sm font-semibold text-gray-700 outline-none bg-transparent cursor-pointer px-1"
+            />
+            <button onClick={() => setDailyDate((value) => addDays(value, 1))} disabled={isToday}
+              className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
+              <ChevronRight size={16} />
+            </button>
+          </div>
+          <button onClick={() => setDailyDate(new Date())}
+            className="text-xs bg-blue-50 text-blue-600 hover:bg-blue-100 px-3 py-1.5 rounded-full font-medium transition-colors">
+            Today
+          </button>
         </div>
       </div>
 

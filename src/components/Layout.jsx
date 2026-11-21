@@ -176,7 +176,7 @@ export default function Layout() {
               </div>
               <button
                 type="button"
-                onClick={() => navigate('/credits')}
+                onClick={() => navigate('/credits?status=unpaid')}
                 className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 transition-colors"
               >
                 View credits

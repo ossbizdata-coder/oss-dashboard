@@ -202,6 +202,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
             {SHOP_CARDS.map(({ code, label, icon: Icon, border, text, bg }) => {
               const summary = shopSummaries[code] || {}
+              const profit = calcProfit(code)
               const shopDateLink = `/shops/${code}?date=${encodeURIComponent(dateStr)}`
 
               return (
@@ -210,7 +211,10 @@ export default function DashboardPage() {
                     <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
                       <Icon size={18} className="text-white" />
                     </div>
-                    <h3 className={`font-semibold text-[18px] leading-none ${text}`}>{label}</h3>
+                    <h3 className={`font-semibold text-[18px] leading-none ${text}`}>
+                      {label}
+                      <span className="ml-1 text-[14px] font-bold">({formatRs(profit)})</span>
+                    </h3>
                     <Link to={shopDateLink} className="ml-auto text-xs text-gray-400 group-hover:text-primary-600 transition-colors">
                       View →
                     </Link>
@@ -245,16 +249,6 @@ export default function DashboardPage() {
                           {formatRs(summary.totalCredits)}
                         </Link>
                       </div>
-                    </div>
-
-                    <div className="rounded-lg bg-blue-50 px-2.5 py-2">
-                      <p className="text-gray-500 text-xs">Profit</p>
-                      <p className="font-bold text-blue-700 text-xl mt-0.5 leading-tight">{formatRs(calcProfit(code))}</p>
-                      {(summary.reloadExpense || 0) > 0 && (
-                        <p className="text-[10px] text-blue-700/80 mt-0.5">
-                          Reload adjusted
-                        </p>
-                      )}
                     </div>
                   </div>
                 </div>

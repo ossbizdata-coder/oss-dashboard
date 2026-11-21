@@ -20,6 +20,7 @@ const SHOP_META = {
 }
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const YTD_START_MONTH = 10 // October
 
 const getTrackedShops = (summary = {}) => (summary.shops || []).filter((shop) => SHOP_META[shop.shopCode])
 
@@ -50,6 +51,7 @@ export default function MonthlyPage() {
 
   const year = selectedMonth.getFullYear()
   const month = selectedMonth.getMonth() + 1
+  const ytdStartMonth = month >= YTD_START_MONTH ? YTD_START_MONTH : month
   const isCurrentMonth = year === new Date().getFullYear() && month === new Date().getMonth() + 1
 
   const getShopProfit = (shopCode, totalSales, reloadMap = reloadByShop) =>
@@ -92,7 +94,7 @@ export default function MonthlyPage() {
       let ytdSalary = 0
       let ytdFixed = 0
 
-      for (let currentMonth = 1; currentMonth <= month; currentMonth += 1) {
+      for (let currentMonth = ytdStartMonth; currentMonth <= month; currentMonth += 1) {
         const monthDate = new Date(year, currentMonth - 1, 1)
         const [summaryRes, salaryRes, settingsRes, monthlyExpenseItemsRes] = await Promise.allSettled([
           dailyCashApi.getMonthlySummary(year, currentMonth),
@@ -212,7 +214,7 @@ export default function MonthlyPage() {
         <div className="card mb-6 border border-primary-100">
           <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="px-2 py-0.5 rounded bg-primary-700 text-white text-xs font-bold">YTD</span>
-            <span className="text-gray-600">Jan - {MONTHS[month - 1]} {year}</span>
+            <span className="text-gray-600">Jan - {MONTHS[month - 1]} {year} (today)</span>
             <span className="text-gray-400">•</span>
             <span className="font-semibold text-blue-700">Gross Profit: {formatRs(ytd.gross)}</span>
             <span className="text-gray-400">•</span>
