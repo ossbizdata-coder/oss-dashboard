@@ -145,46 +145,49 @@ export default function DashboardPage() {
 
       {loading ? <LoadingSpinner size="lg" /> : (
         <>
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div className="card border-l-4 border-emerald-500 bg-gradient-to-br from-emerald-50 via-white to-white p-4">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
+            <div className="card border-l-4 border-emerald-500 bg-gradient-to-br from-emerald-50 via-white to-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[15px] font-semibold text-gray-700">Sales</p>
-                  <p className="text-[23px] font-extrabold text-emerald-700 mt-2">{formatRs(totalSales)}</p>
+                  <p className="text-sm font-semibold text-gray-700">Sales</p>
+                  <p className="text-[20px] font-extrabold text-emerald-700 mt-1 leading-tight">{formatRs(totalSales)}</p>
                 </div>
-                <div className="rounded-xl bg-emerald-100 p-2.5 text-emerald-700"><TrendingUp size={18} /></div>
+                <div className="rounded-xl bg-emerald-100 p-2 text-emerald-700"><TrendingUp size={17} /></div>
               </div>
             </div>
-            <div className="card border-l-4 border-red-500 bg-gradient-to-br from-red-50 via-white to-white p-4">
+            <div className="card border-l-4 border-red-500 bg-gradient-to-br from-red-50 via-white to-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[15px] font-semibold text-gray-700">Expenses</p>
-                  <p className="text-[23px] font-extrabold text-red-700 mt-2">{formatRs(totalExpenses)}</p>
+                  <p className="text-sm font-semibold text-gray-700">Expenses</p>
+                  <p className="text-[20px] font-extrabold text-red-700 mt-1 leading-tight">{formatRs(totalExpenses)}</p>
                 </div>
-                <div className="rounded-xl bg-red-100 p-2.5 text-red-700"><TrendingDown size={18} /></div>
+                <div className="rounded-xl bg-red-100 p-2 text-red-700"><TrendingDown size={17} /></div>
               </div>
             </div>
-            <div className="card border-l-4 border-blue-500 bg-gradient-to-br from-blue-50 via-white to-white p-4">
+            <div className="card border-l-4 border-blue-500 bg-gradient-to-br from-blue-50 via-white to-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[15px] font-semibold text-gray-700">Profit</p>
-                  <p className="text-[23px] font-extrabold text-blue-700 mt-2">{formatRs(totalProfit)}</p>
+                  <p className="text-sm font-semibold text-gray-700">Profit</p>
+                  <p className="text-[20px] font-extrabold text-blue-700 mt-1 leading-tight">{formatRs(totalProfit)}</p>
                   {totalReloadExpense > 0 && (
-                    <p className="text-[11px] text-blue-700/80 mt-1">
-                      Reload adjusted (−{formatRs(reloadAdjustment)}) from {formatRs(totalReloadExpense)} reload expense
+                    <p
+                      className="text-[11px] text-blue-700/80 mt-0.5 whitespace-nowrap overflow-hidden text-ellipsis"
+                      title={`Reload adjusted (−${formatRs(reloadAdjustment)}) from ${formatRs(totalReloadExpense)} reload expense`}
+                    >
+                      Reload adjusted (−{formatRs(reloadAdjustment)})
                     </p>
                   )}
                 </div>
-                <div className="rounded-xl bg-blue-100 p-2.5 text-blue-700"><DollarSign size={18} /></div>
+                <div className="rounded-xl bg-blue-100 p-2 text-blue-700"><DollarSign size={17} /></div>
               </div>
             </div>
-            <div className="card border-l-4 border-amber-500 bg-gradient-to-br from-amber-50 via-white to-white p-4">
+            <div className="card border-l-4 border-amber-500 bg-gradient-to-br from-amber-50 via-white to-white p-3">
               <div className="flex items-center justify-between gap-3">
                 <div>
-                  <p className="text-[15px] font-semibold text-gray-700">Credits</p>
-                  <p className="text-[23px] font-extrabold text-amber-700 mt-2">{formatRs(totalDailyCredits)}</p>
+                  <p className="text-sm font-semibold text-gray-700">Credits</p>
+                  <p className="text-[20px] font-extrabold text-amber-700 mt-1 leading-tight">{formatRs(totalDailyCredits)}</p>
                 </div>
-                <div className="rounded-xl bg-amber-100 p-2.5 text-amber-700"><CreditCard size={18} /></div>
+                <div className="rounded-xl bg-amber-100 p-2 text-amber-700"><CreditCard size={17} /></div>
               </div>
             </div>
           </div>
