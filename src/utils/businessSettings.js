@@ -2,6 +2,7 @@ import { getDaysInMonth } from 'date-fns'
 
 export const SHOP_CODES = ['CAFE', 'BOOKSHOP', 'FOODHUT']
 export const BUSINESS_SETTINGS_UPDATED_EVENT = 'oss-business-settings-updated'
+const SALES_EXCLUDED_EXPENSE_TYPE_KEYS = new Set(['bankdeposit', 'staffsalary', 'staffsalaries'])
 
 const STORAGE_KEY = 'oss-business-settings'
 const MONTH_KEY_PATTERN = /^\d{4}-\d{2}$/
@@ -169,7 +170,18 @@ export function saveBusinessSettings(settings, targetDate = new Date()) {
 
 export function calculateCalculatedSales(summary = {}) {
   const safeSummary = summary && typeof summary === 'object' ? summary : {}
-  return Math.max(0, toNumber(safeSummary.calculatedSales ?? safeSummary.totalSales))
+  const baseSales = toNumber(safeSummary.calculatedSales ?? safeSummary.totalSales)
+  const expenses = Array.isArray(safeSummary.expenses) ? safeSummary.expenses : []
+  const excludedExpenses = expenses.reduce((sum, expense) => {
+    const normalizedType = String(expense?.expenseTypeName || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z]/g, '')
+    if (!SALES_EXCLUDED_EXPENSE_TYPE_KEYS.has(normalizedType)) return sum
+    return sum + Math.max(0, toNumber(expense?.amount))
+  }, 0)
+
+  return Math.max(0, baseSales - excludedExpenses)
 }
 
 export function calculateRevenue(summary = {}) {
