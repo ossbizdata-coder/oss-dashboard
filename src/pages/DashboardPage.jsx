@@ -23,6 +23,7 @@ export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
   const [shopSummaries, setShopSummaries] = useState({})
+  const [todayRemainingCash, setTodayRemainingCash] = useState(null)
   const [loadWarning, setLoadWarning] = useState('')
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
@@ -32,6 +33,7 @@ export default function DashboardPage() {
     setLoading(true)
     setLoadWarning('')
     try {
+      const today = todayStr()
       const loadOneShop = async (shopCode) => {
         const response = await dailyCashApi.getSummary(shopCode, dateStr)
         const data = response.data || {}
@@ -63,6 +65,20 @@ export default function DashboardPage() {
       })
       setShopSummaries(map)
       if (failed > 0) setLoadWarning(`Some shop totals could not be loaded for ${dateStr}.`)
+
+      if (dateStr === today) {
+        const total = SHOPS.reduce((sum, shopCode) => sum + (map[shopCode]?.closingBalance || 0), 0)
+        setTodayRemainingCash(total)
+      } else {
+        const todaySummaries = await Promise.allSettled(
+          SHOPS.map((shopCode) => dailyCashApi.getSummary(shopCode, today))
+        )
+        const total = todaySummaries.reduce((sum, result) => {
+          if (result.status !== 'fulfilled') return sum
+          return sum + (result.value.data?.closingCash || 0)
+        }, 0)
+        setTodayRemainingCash(total)
+      }
     } finally {
       setLoading(false)
     }
@@ -87,7 +103,7 @@ export default function DashboardPage() {
   return (
     <div>
       <div className="flex flex-col gap-3 mb-6 xl:flex-row xl:items-center xl:justify-between">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <h1 className="text-2xl font-bold text-gray-900">Business Dashboard</h1>
           <div className="flex items-center bg-white border border-gray-200 rounded-2xl px-2 py-1.5 gap-1 shadow-sm">
             <button onClick={() => setSelectedDate((date) => subDays(date, 1))}
@@ -105,6 +121,9 @@ export default function DashboardPage() {
               className="p-1.5 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-30">
               <ChevronRight size={16} />
             </button>
+          </div>
+          <div className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 whitespace-nowrap">
+            Today Remaining Cash: {todayRemainingCash == null ? '—' : formatRs(todayRemainingCash)}
           </div>
           {!isToday && (
             <button onClick={() => setSelectedDate(new Date())}
@@ -183,53 +202,53 @@ export default function DashboardPage() {
               const shopDateLink = `/shops/${code}?date=${encodeURIComponent(dateStr)}`
 
               return (
-                <div key={code} className={`card hover:shadow-md transition-shadow border-l-4 ${border} group`}>
-                  <div className="flex items-center gap-3 mb-4">
-                    <div className={`w-10 h-10 ${bg} rounded-xl flex items-center justify-center`}>
-                      <Icon size={20} className="text-white" />
+                <div key={code} className={`card p-3 hover:shadow-md transition-shadow border-l-4 ${border} group`}>
+                  <div className="flex items-center gap-2.5 mb-3">
+                    <div className={`w-9 h-9 ${bg} rounded-lg flex items-center justify-center`}>
+                      <Icon size={18} className="text-white" />
                     </div>
-                    <h3 className={`font-semibold ${text}`}>{label}</h3>
+                    <h3 className={`font-semibold text-[18px] leading-none ${text}`}>{label}</h3>
                     <Link to={shopDateLink} className="ml-auto text-xs text-gray-400 group-hover:text-primary-600 transition-colors">
                       View →
                     </Link>
                   </div>
 
-                  <div className="space-y-3 text-sm">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="rounded-xl bg-gray-50 px-3 py-2">
+                  <div className="space-y-2.5 text-sm">
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <div className="rounded-lg bg-gray-50 px-2.5 py-1.5">
                         <p className="text-gray-500 text-xs">Opening</p>
-                        <p className="font-bold text-gray-800 mt-1">{formatRs(summary.openingBalance)}</p>
+                        <p className="font-bold text-gray-800 mt-0.5">{formatRs(summary.openingBalance)}</p>
                       </div>
-                      <div className="rounded-xl bg-gray-50 px-3 py-2">
+                      <div className="rounded-lg bg-gray-50 px-2.5 py-1.5">
                         <p className="text-gray-500 text-xs">Closing</p>
-                        <p className="font-bold text-gray-800 mt-1">{formatRs(summary.closingBalance)}</p>
+                        <p className="font-bold text-gray-800 mt-0.5">{formatRs(summary.closingBalance)}</p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-3 gap-3">
-                      <div className="rounded-xl bg-green-50 px-3 py-2">
+                    <div className="grid grid-cols-3 gap-2.5">
+                      <div className="rounded-lg bg-green-50 px-2.5 py-1.5">
                         <p className="text-gray-500 text-xs">Sales</p>
-                        <p className="font-bold text-green-700 mt-1">{formatRs(calcSales(summary))}</p>
+                        <p className="font-bold text-green-700 mt-0.5">{formatRs(calcSales(summary))}</p>
                       </div>
-                      <div className="rounded-xl bg-red-50 px-3 py-2">
+                      <div className="rounded-lg bg-red-50 px-2.5 py-1.5">
                         <p className="text-gray-500 text-xs">Expenses</p>
-                        <Link to={shopDateLink} className="font-bold text-red-600 mt-1 inline-block hover:underline">
+                        <Link to={shopDateLink} className="font-bold text-red-600 mt-0.5 inline-block hover:underline">
                           {formatRs(summary.totalExpenses)}
                         </Link>
                       </div>
-                      <div className="rounded-xl bg-amber-50 px-3 py-2">
+                      <div className="rounded-lg bg-amber-50 px-2.5 py-1.5">
                         <p className="text-gray-500 text-xs">Credits</p>
-                        <Link to={shopDateLink} className="font-bold text-amber-600 mt-1 inline-block hover:underline">
+                        <Link to={shopDateLink} className="font-bold text-amber-600 mt-0.5 inline-block hover:underline">
                           {formatRs(summary.totalCredits)}
                         </Link>
                       </div>
                     </div>
 
-                    <div className="rounded-xl bg-blue-50 px-3 py-3">
+                    <div className="rounded-lg bg-blue-50 px-2.5 py-2">
                       <p className="text-gray-500 text-xs">Profit</p>
-                      <p className="font-bold text-blue-700 text-lg mt-1">{formatRs(calcProfit(code))}</p>
+                      <p className="font-bold text-blue-700 text-xl mt-0.5 leading-tight">{formatRs(calcProfit(code))}</p>
                       {(summary.reloadExpense || 0) > 0 && (
-                        <p className="text-[10px] text-blue-700/80 mt-1">
+                        <p className="text-[10px] text-blue-700/80 mt-0.5">
                           Reload adjusted
                         </p>
                       )}

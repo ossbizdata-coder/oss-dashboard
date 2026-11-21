@@ -193,8 +193,9 @@ export default function CreditsPage() {
                       </div>
                       <p className="text-sm text-gray-500 mt-1">{c.reason || 'No reason provided'}</p>
                       <p className="text-xs text-gray-400 mt-1">
-                       {c.transactionDate ? `Date: ${c.transactionDate}` : ''}
-                       {c.createdAt ? ` · Added ${format(new Date(c.createdAt), 'MMM d, yyyy')}` : ''}
+                        {`Credit ID: ${c.id ?? '—'}`}
+                        {c.transactionDate ? ` · Date: ${c.transactionDate}` : ''}
+                        {c.createdAt ? ` · Added ${format(new Date(c.createdAt), 'MMM d, yyyy')}` : ''}
                       </p>
                     </div>
                     <div className="text-right shrink-0">
