@@ -1,5 +1,5 @@
 import { useMemo, useEffect, useState } from 'react'
-import { Tag, Trash2, Plus, Percent, Wallet, Save } from 'lucide-react'
+import { Tag, Trash2, Plus, Percent, Wallet, Save, Pencil, Check, X } from 'lucide-react'
 import { Badge, EmptyState, LoadingSpinner, PageHeader } from '../components/ui.jsx'
 import { businessSettingsApi, expenseTypeApi } from '../services/api.js'
 import useBusinessSettings from '../hooks/useBusinessSettings.js'
@@ -26,6 +26,9 @@ export default function SettingsPage() {
   const [newExpense, setNewExpense] = useState('')
   const [newExpenseShopType, setNewExpenseShopType] = useState('COMMON')
   const [adding, setAdding] = useState(false)
+  const [editingExpenseId, setEditingExpenseId] = useState(null)
+  const [editingExpenseName, setEditingExpenseName] = useState('')
+  const [updatingExpenseId, setUpdatingExpenseId] = useState(null)
   const [saving, setSaving] = useState(false)
   const [businessSettings, setBusinessSettings] = useBusinessSettings(selectedMonth)
   const selectedMonthKey = useMemo(() => getMonthKey(selectedMonth), [selectedMonth])
@@ -63,6 +66,34 @@ export default function SettingsPage() {
     if (!confirm('Delete this expense type?')) return
     await expenseTypeApi.delete(id)
     await load()
+  }
+
+  const startEditExpense = (expenseType) => {
+    setEditingExpenseId(expenseType.id)
+    setEditingExpenseName(sanitizeDisplayText(expenseType.name, ''))
+  }
+
+  const cancelEditExpense = () => {
+    setEditingExpenseId(null)
+    setEditingExpenseName('')
+  }
+
+  const handleUpdateExpense = async (expenseType) => {
+    const nextName = editingExpenseName.trim()
+    if (!nextName) return
+    setUpdatingExpenseId(expenseType.id)
+    try {
+      await expenseTypeApi.update(expenseType.id, {
+        name: nextName,
+        shopType: expenseType.shopType || 'COMMON',
+      })
+      cancelEditExpense()
+      await load()
+    } catch (error) {
+      alert(error?.response?.data?.message || error?.response?.data || error.message)
+    } finally {
+      setUpdatingExpenseId(null)
+    }
   }
 
   const handleSaveBusinessSettings = async () => {
@@ -252,17 +283,61 @@ export default function SettingsPage() {
                       .map((expenseType) => (
                         <div key={expenseType.id} className="flex items-center justify-between gap-3 p-3 bg-gray-50 rounded-xl">
                           <div>
-                            <p className="font-medium text-gray-800 text-sm">{sanitizeDisplayText(expenseType.name)}</p>
+                            {editingExpenseId === expenseType.id ? (
+                              <input
+                                type="text"
+                                value={editingExpenseName}
+                                onChange={(event) => setEditingExpenseName(event.target.value)}
+                                onKeyDown={(event) => event.key === 'Enter' && handleUpdateExpense(expenseType)}
+                                className="px-3 py-1.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                                autoFocus
+                              />
+                            ) : (
+                              <p className="font-medium text-gray-800 text-sm">{sanitizeDisplayText(expenseType.name)}</p>
+                            )}
                             <div className="mt-1">
                               <Badge color="blue">{sanitizeDisplayText(expenseType.shopType, 'Common')}</Badge>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleDeleteExpense(expenseType.id)}
-                            className="text-red-400 hover:text-red-600 p-1 rounded transition-colors"
-                          >
-                            <Trash2 size={16} />
-                          </button>
+                          <div className="flex items-center gap-1">
+                            {editingExpenseId === expenseType.id ? (
+                              <>
+                                <button
+                                  onClick={() => handleUpdateExpense(expenseType)}
+                                  disabled={updatingExpenseId === expenseType.id || !editingExpenseName.trim()}
+                                  className="text-green-600 hover:text-green-700 p-1 rounded transition-colors disabled:opacity-40"
+                                  title="Save"
+                                >
+                                  <Check size={16} />
+                                </button>
+                                <button
+                                  onClick={cancelEditExpense}
+                                  disabled={updatingExpenseId === expenseType.id}
+                                  className="text-gray-500 hover:text-gray-700 p-1 rounded transition-colors disabled:opacity-40"
+                                  title="Cancel"
+                                >
+                                  <X size={16} />
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => startEditExpense(expenseType)}
+                                  className="text-blue-500 hover:text-blue-700 p-1 rounded transition-colors"
+                                  title="Rename"
+                                >
+                                  <Pencil size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteExpense(expenseType.id)}
+                                  className="text-red-400 hover:text-red-600 p-1 rounded transition-colors"
+                                  title="Delete"
+                                >
+                                  <Trash2 size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
                         </div>
                       ))}
                   </div>

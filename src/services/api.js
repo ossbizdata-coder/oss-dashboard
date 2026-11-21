@@ -115,6 +115,7 @@ export const reportApi = {
 export const expenseTypeApi = {
   getAll: (shopType) => api.get('/expenses/types', { params: shopType ? { shopType } : undefined }),
   create: (data) => api.post('/expenses/types', data),
+  update: (id, data) => api.put(`/expenses/types/${id}`, data),
   delete: (id) => api.delete(`/expenses/types/${id}`),
 }
 
