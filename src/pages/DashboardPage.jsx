@@ -18,12 +18,28 @@ const SHOP_CARDS = [
 ]
 
 const todayStr = () => format(new Date(), 'yyyy-MM-dd')
+const MAX_CASH_LOOKBACK_DAYS = 120
+
+const toNumber = (value) => {
+  const num = Number(value)
+  return Number.isFinite(num) ? num : 0
+}
+
+const extractEndingBalance = (data) => {
+  const candidates = [data?.endingBalance, data?.closingCash, data?.closingBalance]
+  for (const candidate of candidates) {
+    if (candidate == null || candidate === '') continue
+    const parsed = Number(candidate)
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return null
+}
 
 export default function DashboardPage() {
   const [selectedDate, setSelectedDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
   const [shopSummaries, setShopSummaries] = useState({})
-  const [todayRemainingCash, setTodayRemainingCash] = useState(null)
+  const [cashInHand, setCashInHand] = useState(null)
   const [loadWarning, setLoadWarning] = useState('')
 
   const dateStr = format(selectedDate, 'yyyy-MM-dd')
@@ -39,14 +55,26 @@ export default function DashboardPage() {
         const data = response.data || {}
         return {
           shop: shopCode,
-          openingBalance: data.openingCash,
-          closingBalance: data.closingCash,
-          totalExpenses: data.totalExpenses || 0,
-          totalCredits: data.totalCredits || 0,
-          manualSales: data.manualSales || 0,
-          calculatedSales: data.totalSales || 0,
+          openingBalance: toNumber(data.openingCash),
+          closingBalance: toNumber(extractEndingBalance(data)),
+          totalExpenses: toNumber(data.totalExpenses),
+          totalCredits: toNumber(data.totalCredits),
+          manualSales: toNumber(data.manualSales),
+          calculatedSales: toNumber(data.totalSales),
           reloadExpense: getReloadExpenseAmount(data.expenses || []),
         }
+      }
+
+      const findLatestClosingBalance = async (shopCode) => {
+        const baseDate = new Date(`${today}T00:00:00`)
+        for (let offset = 0; offset <= MAX_CASH_LOOKBACK_DAYS; offset += 1) {
+          const probeDate = format(subDays(baseDate, offset), 'yyyy-MM-dd')
+          const result = await Promise.allSettled([dailyCashApi.getSummary(shopCode, probeDate)])
+          if (result[0].status !== 'fulfilled') continue
+          const endingBalance = extractEndingBalance(result[0].value.data)
+          if (endingBalance != null) return endingBalance
+        }
+        return 0
       }
 
       const summaries = await Promise.allSettled(
@@ -66,19 +94,8 @@ export default function DashboardPage() {
       setShopSummaries(map)
       if (failed > 0) setLoadWarning(`Some shop totals could not be loaded for ${dateStr}.`)
 
-      if (dateStr === today) {
-        const total = SHOPS.reduce((sum, shopCode) => sum + (map[shopCode]?.closingBalance || 0), 0)
-        setTodayRemainingCash(total)
-      } else {
-        const todaySummaries = await Promise.allSettled(
-          SHOPS.map((shopCode) => dailyCashApi.getSummary(shopCode, today))
-        )
-        const total = todaySummaries.reduce((sum, result) => {
-          if (result.status !== 'fulfilled') return sum
-          return sum + (result.value.data?.closingCash || 0)
-        }, 0)
-        setTodayRemainingCash(total)
-      }
+      const cashBalances = await Promise.all(SHOPS.map((shopCode) => findLatestClosingBalance(shopCode)))
+      setCashInHand(cashBalances.reduce((sum, amount) => sum + amount, 0))
     } finally {
       setLoading(false)
     }
@@ -122,8 +139,8 @@ export default function DashboardPage() {
               <ChevronRight size={16} />
             </button>
           </div>
-          <div className="px-3 py-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-sm font-semibold text-emerald-700 whitespace-nowrap">
-            Today Remaining Cash: {todayRemainingCash == null ? '—' : formatRs(todayRemainingCash)}
+          <div className="px-4 py-2 rounded-xl border-2 border-emerald-300 bg-emerald-100 text-base font-extrabold text-emerald-800 whitespace-nowrap shadow-sm">
+            Cash in Hand: {cashInHand == null ? '—' : formatRs(cashInHand)}
           </div>
           {!isToday && (
             <button onClick={() => setSelectedDate(new Date())}

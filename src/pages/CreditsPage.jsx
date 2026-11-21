@@ -48,9 +48,18 @@ export default function CreditsPage() {
     return sortDir === 'asc' ? ' ↑' : ' ↓'
   }
 
-  const filtered = credits
+  const baseFiltered = credits
     .filter(c => filter === 'all' ? true : filter === 'unpaid' ? !c.isPaid : c.isPaid)
     .filter(c => shopFilter === 'all' ? true : (c.department || 'COMMON') === shopFilter)
+  const uniqueUsers = [...new Set(baseFiltered.map(c => c.userName).filter(Boolean))].sort()
+
+  useEffect(() => {
+    if (userFilter !== 'all' && !uniqueUsers.includes(userFilter)) {
+      setUserFilter('all')
+    }
+  }, [userFilter, uniqueUsers])
+
+  const filtered = baseFiltered
     .filter(c => userFilter === 'all' ? true : c.userName === userFilter)
     .sort((a, b) => {
       let aVal, bVal
@@ -69,8 +78,6 @@ export default function CreditsPage() {
       }
       return sortDir === 'asc' ? (aVal < bVal ? -1 : aVal > bVal ? 1 : 0) : (aVal > bVal ? -1 : aVal < bVal ? 1 : 0)
     })
-
-  const uniqueUsers = [...new Set(credits.map(c => c.userName).filter(Boolean))].sort()
 
   const totalCreditsAmount = credits.reduce((sum, c) => sum + (c.amount || 0), 0)
   const totalPaidAmount = credits.filter((c) => c.isPaid).reduce((sum, c) => sum + (c.amount || 0), 0)
