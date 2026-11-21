@@ -18,8 +18,6 @@ const SHOP_CARDS = [
 ]
 
 const todayStr = () => format(new Date(), 'yyyy-MM-dd')
-const MAX_CASH_LOOKBACK_DAYS = 120
-
 const toNumber = (value) => {
   const num = Number(value)
   return Number.isFinite(num) ? num : 0
@@ -49,7 +47,6 @@ export default function DashboardPage() {
     setLoading(true)
     setLoadWarning('')
     try {
-      const today = todayStr()
       const loadOneShop = async (shopCode) => {
         const response = await dailyCashApi.getSummary(shopCode, dateStr)
         const data = response.data || {}
@@ -63,18 +60,6 @@ export default function DashboardPage() {
           calculatedSales: toNumber(data.totalSales),
           reloadExpense: getReloadExpenseAmount(data.expenses || []),
         }
-      }
-
-      const findLatestClosingBalance = async (shopCode) => {
-        const baseDate = new Date(`${today}T00:00:00`)
-        for (let offset = 0; offset <= MAX_CASH_LOOKBACK_DAYS; offset += 1) {
-          const probeDate = format(subDays(baseDate, offset), 'yyyy-MM-dd')
-          const result = await Promise.allSettled([dailyCashApi.getSummary(shopCode, probeDate)])
-          if (result[0].status !== 'fulfilled') continue
-          const endingBalance = extractEndingBalance(result[0].value.data)
-          if (endingBalance != null) return endingBalance
-        }
-        return 0
       }
 
       const summaries = await Promise.allSettled(
@@ -92,10 +77,8 @@ export default function DashboardPage() {
         }
       })
       setShopSummaries(map)
+      setCashInHand(SHOPS.reduce((sum, shopCode) => sum + (map[shopCode]?.closingBalance || 0), 0))
       if (failed > 0) setLoadWarning(`Some shop totals could not be loaded for ${dateStr}.`)
-
-      const cashBalances = await Promise.all(SHOPS.map((shopCode) => findLatestClosingBalance(shopCode)))
-      setCashInHand(cashBalances.reduce((sum, amount) => sum + amount, 0))
     } finally {
       setLoading(false)
     }

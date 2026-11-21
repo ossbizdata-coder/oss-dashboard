@@ -174,12 +174,13 @@ export default function Layout() {
                   {' '}older than 30 days. Please follow up immediately.
                 </p>
               </div>
-              <NavLink
-                to="/credits"
+              <button
+                type="button"
+                onClick={() => navigate('/credits')}
                 className="rounded-lg bg-red-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-red-800 transition-colors"
               >
                 View credits
-              </NavLink>
+              </button>
             </div>
           </div>
         )}
