@@ -110,6 +110,9 @@ export default function ExpensesPage() {
   ), [filterExpenseTypeId, shopData])
 
   const grandTotal = SHOPS.reduce((sum, shop) => sum + (filteredShopData[shop.code]?.totalExpenses || 0), 0)
+  const nonZeroDailyShops = SHOPS
+    .map((shop) => ({ ...shop, data: filteredShopData[shop.code] || { expenses: [], totalExpenses: 0 } }))
+    .filter((shop) => shop.data.totalExpenses > 0)
 
   const filteredMonthlyExpenses = monthlyExpenseTypeId
     ? monthlyExpenses.filter((expense) => Number(expense.expenseTypeId) === monthlyExpenseTypeId)
@@ -394,56 +397,42 @@ export default function ExpensesPage() {
           </div>
 
           {loadingDaily ? <LoadingSpinner /> : (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-              {SHOPS.map(({ code, label, color, textColor, lightBg }) => {
-                const shop = filteredShopData[code] || { expenses: [], totalExpenses: 0 }
-                const expenses = shop.expenses
+            nonZeroDailyShops.length === 0 ? (
+              <EmptyState icon={Receipt} title="No daily expenses" description="No non-zero expenses were found for the selected day." />
+            ) : (
+              <div className="card p-0 overflow-hidden">
+                {nonZeroDailyShops.map(({ code, label, textColor, data: shop }, index) => {
+                  const expenses = shop.expenses
+                  return (
+                    <div key={code} className={index > 0 ? 'border-t border-gray-100' : ''}>
+                      <div className="px-4 py-3 bg-gray-50 flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <h3 className={`font-semibold text-sm ${textColor}`}>{label}</h3>
+                          {shop.locked && (
+                            <span className="text-[10px] text-orange-500 font-medium">LOCKED</span>
+                          )}
+                        </div>
+                        <span className="text-sm font-bold text-red-600">{formatRs(shop.totalExpenses)}</span>
+                      </div>
 
-                return (
-                  <div key={code} className={`card border-l-4 ${color}`}>
-                    <div className="flex items-center justify-between mb-4">
                       <div>
-                        <h2 className={`font-bold text-base ${textColor}`}>{label}</h2>
-                        {shop.locked && (
-                          <span className="text-[10px] text-orange-500 font-medium">LOCKED</span>
-                        )}
-                      </div>
-                      <span className="text-sm font-bold text-red-600">{formatRs(shop.totalExpenses)}</span>
-                    </div>
-
-                    {expenses.length === 0 ? (
-                      <div className="text-center py-6 text-gray-400">
-                        <Receipt size={28} className="mx-auto mb-2 opacity-40" />
-                        <p className="text-xs">No expenses recorded</p>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
                         {expenses.map((expense) => (
-                          <div key={expense.id} className={`${lightBg} rounded-xl px-3 py-2 flex items-start gap-2 group`}>
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-xs font-semibold text-gray-700">
-                                  {sanitizeDisplayText(expense.expenseTypeName, 'Expense')}
-                                </span>
+                          <div key={expense.id} className="px-4 py-2.5 border-t border-gray-50 flex items-start justify-between gap-3 group">
+                            <div className="min-w-0">
+                              <p className="text-sm text-gray-800">
+                                <span className="font-medium">{sanitizeDisplayText(expense.expenseTypeName, 'Expense')}</span>
                                 {expense.description && (
-                                  <span className="text-xs text-gray-500 truncate max-w-[140px]">
-                                    — {sanitizeDisplayText(expense.description)}
-                                  </span>
+                                  <span className="text-gray-500"> — {sanitizeDisplayText(expense.description)}</span>
                                 )}
-                              </div>
-                              <div className="flex items-center gap-2 mt-0.5">
-                                <span className="text-xs text-gray-400">
-                                  {expense.createdAt ? formatSLShort(expense.createdAt) : ''}
-                                </span>
-                                {expense.recordedByName && (
-                                  <span className="text-xs text-gray-400">· {expense.recordedByName}</span>
-                                )}
-                              </div>
+                              </p>
+                              <p className="text-xs text-gray-400 mt-0.5">
+                                {expense.createdAt ? formatSLShort(expense.createdAt) : ''}
+                                {expense.recordedByName ? ` · ${expense.recordedByName}` : ''}
+                              </p>
                             </div>
 
                             <div className="flex items-center gap-1 shrink-0">
                               <span className="text-sm font-bold text-red-600">{formatRs(expense.amount)}</span>
-
                               {isSuperAdmin && (
                                 <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-1">
                                   <button
@@ -462,8 +451,10 @@ export default function ExpensesPage() {
                                       >
                                         {deleting === expense.id ? '…' : 'Yes'}
                                       </button>
-                                      <button onClick={() => setDeleteConfirm(null)}
-                                        className="p-1 text-gray-400 hover:bg-gray-100 rounded">
+                                      <button
+                                        onClick={() => setDeleteConfirm(null)}
+                                        className="p-1 text-gray-400 hover:bg-gray-100 rounded"
+                                      >
                                         <X size={11} />
                                       </button>
                                     </>
@@ -482,18 +473,11 @@ export default function ExpensesPage() {
                           </div>
                         ))}
                       </div>
-                    )}
-
-                    {expenses.length > 0 && (
-                      <div className="mt-3 pt-3 border-t border-gray-100 flex justify-between text-xs text-gray-500">
-                        <span>{expenses.length} item{expenses.length !== 1 ? 's' : ''}</span>
-                        <span className="font-semibold text-red-600">{formatRs(shop.totalExpenses)}</span>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
+                    </div>
+                  )
+                })}
+              </div>
+            )
           )}
         </>
       )}
