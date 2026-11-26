@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { userApi } from '../services/api.js'
 import { PageHeader, LoadingSpinner, formatRs } from '../components/ui.jsx'
 import { useAuth } from '../contexts/AuthContext.jsx'
@@ -38,6 +38,12 @@ export default function UsersPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  const sortedUsers = useMemo(() => (
+    users
+      .slice()
+      .sort((left, right) => String(left?.name || '').localeCompare(String(right?.name || '')))
+  ), [users])
 
   const openEdit = (u) => setEditUser({ ...u, newPassword: '' })
   const closeEdit = () => setEditUser(null)
@@ -122,7 +128,7 @@ export default function UsersPage() {
               </tr>
             </thead>
             <tbody>
-              {users.map(u => (
+              {sortedUsers.map(u => (
                 <tr key={u.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
                   <td className="py-3 pr-4">
                     <div className="flex items-center gap-2">

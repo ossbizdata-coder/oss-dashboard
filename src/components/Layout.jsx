@@ -11,16 +11,16 @@ import { creditApi } from '../services/api.js'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, exact: true },
-  { to: '/shops', label: 'Departments', icon: Store },
-  { to: '/monthly', label: 'Monthly Summary', icon: CalendarDays, superAdminOnly: true },
-  { to: '/staff', label: 'Staff & HR', icon: Users },
-  { to: '/credits',  label: 'Credits',    icon: CreditCard },
   { to: '/expenses', label: 'Expenses',   icon: Receipt },
+  { to: '/credits',  label: 'Credits',    icon: CreditCard },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/shops', label: 'Departments', icon: Store },
+  { to: '/staff', label: 'Attendance and Salary', icon: Users },
+  { to: '/monthly', label: 'Business Summary', icon: CalendarDays, superAdminOnly: true },
   { to: '/analysis', label: 'Analysis', icon: Brain, ownerOnly: true },
-  { to: '/users', label: 'Users', icon: Users, superAdminOnly: true },
   { to: '/audit-logs', label: 'Audit Logs', icon: Shield, superAdminOnly: true },
-  { to: '/settings',   label: 'Settings', icon: Settings, superAdminOnly: true },
+  { to: '/users', label: 'Users', icon: Users, superAdminOnly: true },
+  { to: '/settings',   label: 'Stettings', icon: Settings, superAdminOnly: true },
 ]
 
 export default function Layout() {
