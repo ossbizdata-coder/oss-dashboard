@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext.jsx'
 import {
   LayoutDashboard, Store, Users, CreditCard,
   BarChart3, Shield, Settings, LogOut, Menu, CalendarDays, Receipt,
-  AlertTriangle
+  AlertTriangle, Brain
 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import clsx from 'clsx'
@@ -17,12 +17,14 @@ const navItems = [
   { to: '/credits',  label: 'Credits',    icon: CreditCard },
   { to: '/expenses', label: 'Expenses',   icon: Receipt },
   { to: '/reports', label: 'Reports', icon: BarChart3 },
+  { to: '/analysis', label: 'Analysis', icon: Brain, ownerOnly: true },
+  { to: '/users', label: 'Users', icon: Users, superAdminOnly: true },
   { to: '/audit-logs', label: 'Audit Logs', icon: Shield, superAdminOnly: true },
   { to: '/settings',   label: 'Settings', icon: Settings, superAdminOnly: true },
 ]
 
 export default function Layout() {
-  const { user, logout, isSuperAdmin } = useAuth()
+  const { user, logout, isSuperAdmin, isOwnerUser } = useAuth()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [urgentCredits, setUrgentCredits] = useState([])
@@ -64,7 +66,11 @@ export default function Layout() {
     navigate('/login')
   }
 
-  const visibleNav = navItems.filter(item => !item.superAdminOnly || isSuperAdmin)
+  const visibleNav = navItems.filter((item) => {
+    if (item.superAdminOnly && !isSuperAdmin) return false
+    if (item.ownerOnly && !isOwnerUser) return false
+    return true
+  })
   const urgentDepartmentSummary = urgentCredits.reduce((summary, credit) => {
     const department = (credit.department || 'COMMON').toUpperCase()
     summary[department] = (summary[department] || 0) + 1

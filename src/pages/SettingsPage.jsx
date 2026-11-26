@@ -64,8 +64,12 @@ export default function SettingsPage() {
 
   const handleDeleteExpense = async (id) => {
     if (!confirm('Delete this expense type?')) return
-    await expenseTypeApi.delete(id)
-    await load()
+    try {
+      await expenseTypeApi.delete(id)
+      await load()
+    } catch (error) {
+      alert(error?.response?.data?.message || error?.response?.data || error.message)
+    }
   }
 
   const startEditExpense = (expenseType) => {

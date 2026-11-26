@@ -27,6 +27,7 @@ export default function ExpensesPage() {
   const [expenseTypes, setExpenseTypes] = useState([])
   const [filterExpenseTypeId, setFilterExpenseTypeId] = useState(null)
   const [monthlyExpenseTypeId, setMonthlyExpenseTypeId] = useState(null)
+  const [graphExpenseTypeId, setGraphExpenseTypeId] = useState(null)
   const [monthlyExpenses, setMonthlyExpenses] = useState([])
   const [loadingDaily, setLoadingDaily] = useState(true)
   const [loadingMonthly, setLoadingMonthly] = useState(true)
@@ -150,6 +151,12 @@ export default function ExpensesPage() {
     }
   }, [monthlyExpenseTypeId, monthlyExpenseTypeOptions])
 
+  useEffect(() => {
+    if (graphExpenseTypeId && !monthlyExpenseTypeOptions.some((type) => type.id === graphExpenseTypeId)) {
+      setGraphExpenseTypeId(null)
+    }
+  }, [graphExpenseTypeId, monthlyExpenseTypeOptions])
+
   const graphSeries = useMemo(() => (
     monthlyExpenseTypeOptions.map((type, index) => ({
       ...type,
@@ -170,9 +177,11 @@ export default function ExpensesPage() {
     monthlyExpenses.forEach((expense) => {
       const amount = Number(expense.amount || 0)
       if (amount === 0) return
+      const expenseTypeId = Number(expense.expenseTypeId)
+      if (graphExpenseTypeId && expenseTypeId !== graphExpenseTypeId) return
       const businessDate = expense.businessDate || ''
       if (!businessDate) return
-      const series = graphSeriesByTypeId[Number(expense.expenseTypeId)]
+      const series = graphSeriesByTypeId[expenseTypeId]
       if (!series) return
       if (!byDate[businessDate]) {
         byDate[businessDate] = { businessDate, total: 0 }
@@ -181,7 +190,11 @@ export default function ExpensesPage() {
       byDate[businessDate].total += amount
     })
     return Object.values(byDate).sort((left, right) => String(left.businessDate).localeCompare(String(right.businessDate)))
-  }, [monthlyExpenses, graphSeriesByTypeId])
+  }, [monthlyExpenses, graphSeriesByTypeId, graphExpenseTypeId])
+
+  const filteredGraphSeries = graphExpenseTypeId
+    ? graphSeries.filter((series) => series.id === graphExpenseTypeId)
+    : graphSeries
 
   const monthlyShopTotals = SHOPS.map((shop) => ({
     ...shop,
@@ -321,13 +334,25 @@ export default function ExpensesPage() {
         </div>
       ) : tab === 'graph' ? (
         <div className="card mb-6">
-          <div className="mb-5">
-            <h2 className="font-semibold text-gray-800">Monthly Breakdown by Expense Type</h2>
-            <p className="text-sm text-gray-500 mt-1">Y-axis shows dates (downward). X-axis shows total amount, broken down by expense type.</p>
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="font-semibold text-gray-800">Monthly Breakdown by Expense Type</h2>
+              <p className="text-sm text-gray-500 mt-1">Y-axis shows dates (downward). X-axis shows total amount, broken down by expense type.</p>
+            </div>
+            <select
+              value={graphExpenseTypeId || ''}
+              onChange={(event) => setGraphExpenseTypeId(event.target.value ? parseInt(event.target.value, 10) : null)}
+              className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-primary-400"
+            >
+              <option value="">All Expense Types</option>
+              {monthlyExpenseTypeOptions.map((type) => (
+                <option key={type.id} value={type.id}>{type.name}</option>
+              ))}
+            </select>
           </div>
 
           {loadingMonthly ? <LoadingSpinner /> : (
-            monthlyGraphData.length === 0 || graphSeries.length === 0 ? (
+            monthlyGraphData.length === 0 || filteredGraphSeries.length === 0 ? (
               <EmptyState icon={Receipt} title="No graph data" description="No non-zero monthly expenses were found for graphing." />
             ) : (
               <ResponsiveContainer width="100%" height={420}>
@@ -337,7 +362,7 @@ export default function ExpensesPage() {
                   <YAxis type="category" dataKey="businessDate" width={90} tick={{ fontSize: 11 }} />
                   <Tooltip formatter={(value) => formatRs(value)} />
                   <Legend />
-                  {graphSeries.map((series) => (
+                  {filteredGraphSeries.map((series) => (
                     <Bar key={series.dataKey} dataKey={series.dataKey} name={series.name} stackId="dailyTotal" fill={series.color} />
                   ))}
                 </BarChart>

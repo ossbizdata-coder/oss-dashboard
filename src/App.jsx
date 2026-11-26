@@ -13,6 +13,8 @@ import AuditLogsPage from './pages/AuditLogsPage.jsx'
 import SettingsPage from './pages/SettingsPage.jsx'
 import MonthlyPage from './pages/MonthlyPage.jsx'
 import ExpensesPage from './pages/ExpensesPage.jsx'
+import AnalysisPage from './pages/AnalysisPage.jsx'
+import UsersPage from './pages/UsersPage.jsx'
 
 function PrivateRoute({ children }) {
   const { isLoggedIn, hasAccess } = useAuth()
@@ -41,6 +43,12 @@ function SuperAdminRoute({ children }) {
   return children
 }
 
+function OwnerRoute({ children }) {
+  const { isOwnerUser } = useAuth()
+  if (!isOwnerUser) return <Navigate to="/" replace />
+  return children
+}
+
 export default function App() {
   return (
     <AuthProvider>
@@ -60,7 +68,9 @@ export default function App() {
             <Route path="expenses" element={<ExpensesPage />} />
             <Route path="foodhut" element={<FoodHutPage />} />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="analysis" element={<OwnerRoute><AnalysisPage /></OwnerRoute>} />
             <Route path="monthly" element={<SuperAdminRoute><MonthlyPage /></SuperAdminRoute>} />
+            <Route path="users" element={<SuperAdminRoute><UsersPage /></SuperAdminRoute>} />
             <Route path="audit-logs" element={<AuditLogsPage />} />
             <Route path="settings" element={<SuperAdminRoute><SettingsPage /></SuperAdminRoute>} />
           </Route>

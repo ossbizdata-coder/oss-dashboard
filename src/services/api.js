@@ -114,9 +114,66 @@ export const reportApi = {
 // ── EXPENSE TYPES ──────────────────────────────────────────────────────────
 export const expenseTypeApi = {
   getAll: (shopType) => api.get('/expenses/types', { params: shopType ? { shopType } : undefined }),
-  create: (data) => api.post('/expenses/types', data),
-  update: (id, data) => api.put(`/expenses/types/${id}`, data),
-  delete: (id) => api.delete(`/expenses/types/${id}`),
+  create: async (data) => {
+    const attempts = [
+      () => api.post('/expenses/types', data),
+      () => api.post('/admin/expenses/types', data),
+      () => api.post('/admin/expense-types', data),
+    ]
+    let lastError = null
+    for (const attempt of attempts) {
+      try {
+        return await attempt()
+      } catch (error) {
+        const status = error?.response?.status
+        const isRetryable = status === 403 || status === 404 || status === 405
+        if (!isRetryable) throw error
+        lastError = error
+      }
+    }
+    throw lastError || new Error('Failed to create expense type')
+  },
+  update: async (id, data) => {
+    const attempts = [
+      () => api.put(`/expenses/types/${id}`, data),
+      () => api.patch(`/expenses/types/${id}`, data),
+      () => api.put(`/admin/expenses/types/${id}`, data),
+      () => api.patch(`/admin/expenses/types/${id}`, data),
+      () => api.put(`/admin/expense-types/${id}`, data),
+      () => api.patch(`/admin/expense-types/${id}`, data),
+    ]
+    let lastError = null
+    for (const attempt of attempts) {
+      try {
+        return await attempt()
+      } catch (error) {
+        const status = error?.response?.status
+        const isRetryable = status === 403 || status === 404 || status === 405
+        if (!isRetryable) throw error
+        lastError = error
+      }
+    }
+    throw lastError || new Error('Failed to update expense type')
+  },
+  delete: async (id) => {
+    const attempts = [
+      () => api.delete(`/expenses/types/${id}`),
+      () => api.delete(`/admin/expenses/types/${id}`),
+      () => api.delete(`/admin/expense-types/${id}`),
+    ]
+    let lastError = null
+    for (const attempt of attempts) {
+      try {
+        return await attempt()
+      } catch (error) {
+        const status = error?.response?.status
+        const isRetryable = status === 403 || status === 404 || status === 405
+        if (!isRetryable) throw error
+        lastError = error
+      }
+    }
+    throw lastError || new Error('Failed to delete expense type')
+  },
 }
 
 // ── BUSINESS SETTINGS ────────────────────────────────────────────────────────

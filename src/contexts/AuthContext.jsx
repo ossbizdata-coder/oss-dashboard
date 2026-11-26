@@ -13,8 +13,9 @@ export function AuthProvider({ children }) {
     const name = localStorage.getItem('name')
     const email = localStorage.getItem('email')
     const role = localStorage.getItem('role')
+    const userId = Number(localStorage.getItem('userId') || 0)
     if (token) {
-      setUser({ name, email, role })
+      setUser({ name, email, role, userId: Number.isFinite(userId) ? userId : 0 })
       setIsLoggedIn(true)
     }
     setLoading(false)
@@ -28,7 +29,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem('name', data.name)
     localStorage.setItem('role', data.role)
     localStorage.setItem('userId', data.userId)
-    setUser({ name: data.name, email: data.email, role: data.role })
+    setUser({ name: data.name, email: data.email, role: data.role, userId: Number(data.userId || 0) })
     setIsLoggedIn(true)
     return data
   }
@@ -41,11 +42,12 @@ export function AuthProvider({ children }) {
 
   const isSuperAdmin = user?.role === 'SUPERADMIN'
   const isAdmin = user?.role === 'ADMIN' || isSuperAdmin
+  const isOwnerUser = Number(user?.userId) === 1
   // Only ADMIN and SUPERADMIN can access this dashboard
   const hasAccess = isAdmin
 
   return (
-    <AuthContext.Provider value={{ user, isLoggedIn, loading, login, logout, isSuperAdmin, isAdmin, hasAccess }}>
+    <AuthContext.Provider value={{ user, isLoggedIn, loading, login, logout, isSuperAdmin, isAdmin, isOwnerUser, hasAccess }}>
       {!loading && children}
     </AuthContext.Provider>
   )
@@ -56,4 +58,3 @@ export const useAuth = () => {
   if (!ctx) throw new Error('useAuth must be inside AuthProvider')
   return ctx
 }
-
