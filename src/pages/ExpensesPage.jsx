@@ -6,6 +6,9 @@ import { ChevronLeft, ChevronRight, Pencil, Trash2, X, Check, Receipt, RefreshCw
 import { format, subDays, addDays } from 'date-fns'
 import { formatSLShort } from '../utils/timezone.js'
 import { sanitizeDisplayText } from '../utils/businessSettings.js'
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+} from 'recharts'
 
 const SHOPS = [
   { code: 'CAFE', label: 'Cafe', color: 'border-[#068A4B]', textColor: 'text-[#068A4B]', lightBg: 'bg-green-50' },
@@ -13,8 +16,11 @@ const SHOPS = [
   { code: 'FOODHUT', label: 'Food Hut', color: 'border-[#B65505]', textColor: 'text-[#B65505]', lightBg: 'bg-orange-50' },
 ]
 
+const CHART_COLORS = ['#ef4444', '#2563eb', '#16a34a', '#f59e0b', '#9333ea', '#0891b2', '#e11d48', '#65a30d']
+
 export default function ExpensesPage() {
   const { isSuperAdmin } = useAuth()
+  const [tab, setTab] = useState('monthly')
   const [dailyDate, setDailyDate] = useState(new Date())
   const [selectedMonth, setSelectedMonth] = useState(format(new Date(), 'yyyy-MM'))
   const [shopData, setShopData] = useState({})
@@ -106,11 +112,73 @@ export default function ExpensesPage() {
   const grandTotal = SHOPS.reduce((sum, shop) => sum + (filteredShopData[shop.code]?.totalExpenses || 0), 0)
 
   const filteredMonthlyExpenses = monthlyExpenseTypeId
-    ? monthlyExpenses.filter((expense) => expense.expenseTypeId === monthlyExpenseTypeId)
+    ? monthlyExpenses.filter((expense) => Number(expense.expenseTypeId) === monthlyExpenseTypeId)
     : monthlyExpenses
 
   const monthlyTotal = monthlyExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
   const filteredMonthlyTotal = filteredMonthlyExpenses.reduce((sum, expense) => sum + (expense.amount || 0), 0)
+
+  const monthlyExpenseTypeTotals = useMemo(() => (
+    monthlyExpenses.reduce((acc, expense) => {
+      const typeId = Number(expense.expenseTypeId)
+      if (!typeId) return acc
+      acc[typeId] = (acc[typeId] || 0) + Number(expense.amount || 0)
+      return acc
+    }, {})
+  ), [monthlyExpenses])
+
+  const monthlyExpenseTypeOptions = useMemo(() => (
+    Object.entries(monthlyExpenseTypeTotals)
+      .filter(([, total]) => total !== 0)
+      .map(([typeId]) => {
+        const id = Number(typeId)
+        const type = expenseTypes.find((row) => row.id === id)
+        return {
+          id,
+          name: sanitizeDisplayText(type?.name || monthlyExpenses.find((row) => Number(row.expenseTypeId) === id)?.expenseTypeName || 'Expense'),
+        }
+      })
+      .sort((left, right) => left.name.localeCompare(right.name))
+  ), [monthlyExpenseTypeTotals, expenseTypes, monthlyExpenses])
+
+  useEffect(() => {
+    if (monthlyExpenseTypeId && !monthlyExpenseTypeOptions.some((type) => type.id === monthlyExpenseTypeId)) {
+      setMonthlyExpenseTypeId(null)
+    }
+  }, [monthlyExpenseTypeId, monthlyExpenseTypeOptions])
+
+  const graphSeries = useMemo(() => (
+    monthlyExpenseTypeOptions.map((type, index) => ({
+      ...type,
+      dataKey: `expenseType_${type.id}`,
+      color: CHART_COLORS[index % CHART_COLORS.length],
+    }))
+  ), [monthlyExpenseTypeOptions])
+
+  const graphSeriesByTypeId = useMemo(() => (
+    graphSeries.reduce((acc, series) => {
+      acc[series.id] = series
+      return acc
+    }, {})
+  ), [graphSeries])
+
+  const monthlyGraphData = useMemo(() => {
+    const byDate = {}
+    monthlyExpenses.forEach((expense) => {
+      const amount = Number(expense.amount || 0)
+      if (amount === 0) return
+      const businessDate = expense.businessDate || ''
+      if (!businessDate) return
+      const series = graphSeriesByTypeId[Number(expense.expenseTypeId)]
+      if (!series) return
+      if (!byDate[businessDate]) {
+        byDate[businessDate] = { businessDate, total: 0 }
+      }
+      byDate[businessDate][series.dataKey] = (byDate[businessDate][series.dataKey] || 0) + amount
+      byDate[businessDate].total += amount
+    })
+    return Object.values(byDate).sort((left, right) => String(left.businessDate).localeCompare(String(right.businessDate)))
+  }, [monthlyExpenses, graphSeriesByTypeId])
 
   const monthlyShopTotals = SHOPS.map((shop) => ({
     ...shop,
@@ -183,68 +251,111 @@ export default function ExpensesPage() {
           </>
         )}
       />
-      
-      <div className="card mb-6">
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-          <div>
-            <h2 className="font-semibold text-gray-800">Monthly Expenses</h2>
-            <p className="text-sm text-gray-500 mt-1">Overall expenses for the selected month with expense-type filtering.</p>
+
+      <div className="flex gap-2 mb-4">
+        <button
+          onClick={() => setTab('monthly')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === 'monthly' ? 'bg-primary-700 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+        >
+          Monthly Expenses
+        </button>
+        <button
+          onClick={() => setTab('graph')}
+          className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors ${tab === 'graph' ? 'bg-primary-700 text-white shadow-sm' : 'bg-white border border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+        >
+          Graph
+        </button>
+      </div>
+
+      {tab === 'monthly' ? (
+        <div className="card mb-6">
+          <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+            <div>
+              <h2 className="font-semibold text-gray-800">Monthly Expenses</h2>
+              <p className="text-sm text-gray-500 mt-1">Overall expenses for the selected month with expense-type filtering.</p>
+            </div>
+            <select
+              value={monthlyExpenseTypeId || ''}
+              onChange={(event) => setMonthlyExpenseTypeId(event.target.value ? parseInt(event.target.value) : null)}
+              className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-primary-400"
+            >
+              <option value="">All Expense Types</option>
+              {monthlyExpenseTypeOptions.map((type) => (
+                <option key={type.id} value={type.id}>{type.name}</option>
+              ))}
+            </select>
           </div>
-          <select
-            value={monthlyExpenseTypeId || ''}
-            onChange={(event) => setMonthlyExpenseTypeId(event.target.value ? parseInt(event.target.value) : null)}
-            className="text-sm font-medium bg-white border border-gray-200 rounded-2xl px-3 py-2 text-gray-700 outline-none focus:ring-2 focus:ring-primary-400"
-          >
-            <option value="">All Expense Types</option>
-            {sortedExpenseTypes.map((type) => (
-              <option key={type.id} value={type.id}>{sanitizeDisplayText(type.name)}</option>
-            ))}
-          </select>
-        </div>
 
-        {loadingMonthly ? <LoadingSpinner /> : (
-          filteredMonthlyExpenses.length === 0 ? (
-            <EmptyState icon={Receipt} title="No monthly expenses" description="No expense records were found for the selected month." />
-          ) : (
-            <>
-              <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
-                <div className="rounded-2xl bg-red-50 px-4 py-4 border border-red-100 lg:col-span-1">
-                  <p className="text-xs font-bold uppercase tracking-wide text-red-600">Total Monthly Expenses</p>
-                  <p className="text-2xl font-bold text-red-700 mt-2">{formatRs(monthlyTotal)}</p>
-                  {monthlyExpenseTypeId && (
-                    <p className="text-xs text-red-500 mt-1">Filtered: {formatRs(filteredMonthlyTotal)}</p>
-                  )}
-                </div>
-                {monthlyShopTotals.map((shop) => (
-                  <div key={shop.code} className={`rounded-2xl border px-4 py-4 ${shop.color}`}>
-                    <p className={`text-xs font-bold uppercase tracking-wide ${shop.textColor}`}>{shop.label}</p>
-                    <p className="text-xl font-bold text-gray-900 mt-2">{formatRs(shop.total)}</p>
+          {loadingMonthly ? <LoadingSpinner /> : (
+            filteredMonthlyExpenses.length === 0 ? (
+              <EmptyState icon={Receipt} title="No monthly expenses" description="No expense records were found for the selected month." />
+            ) : (
+              <>
+                <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 mb-5">
+                  <div className="rounded-2xl bg-red-50 px-4 py-4 border border-red-100 lg:col-span-1">
+                    <p className="text-xs font-bold uppercase tracking-wide text-red-600">Total Monthly Expenses</p>
+                    <p className="text-2xl font-bold text-red-700 mt-2">{formatRs(monthlyTotal)}</p>
+                    {monthlyExpenseTypeId && (
+                      <p className="text-xs text-red-500 mt-1">Filtered: {formatRs(filteredMonthlyTotal)}</p>
+                    )}
                   </div>
-                ))}
-              </div>
-
-              <div className="border-t border-gray-100 pt-4">
-                <h3 className="font-medium text-gray-800 mb-3">Recent Monthly Expense Entries</h3>
-                <div className="space-y-2">
-                  {filteredMonthlyExpenses.slice(0, 8).map((expense) => (
-                    <div key={expense.id} className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 rounded-xl px-3 py-2">
-                      <div>
-                        <p className="text-sm font-medium text-gray-800">
-                          {sanitizeDisplayText(expense.expenseTypeName)} · {sanitizeDisplayText(expense.shopName, expense.shopCode || 'Department')}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {sanitizeDisplayText(expense.description)} · {expense.businessDate || 'No date'}
-                        </p>
-                      </div>
-                      <span className="text-sm font-bold text-red-600">{formatRs(expense.amount)}</span>
+                  {monthlyShopTotals.map((shop) => (
+                    <div key={shop.code} className={`rounded-2xl border px-4 py-4 ${shop.color}`}>
+                      <p className={`text-xs font-bold uppercase tracking-wide ${shop.textColor}`}>{shop.label}</p>
+                      <p className="text-xl font-bold text-gray-900 mt-2">{formatRs(shop.total)}</p>
                     </div>
                   ))}
                 </div>
-              </div>
-            </>
-          )
-        )}
-      </div>
+
+                <div className="border-t border-gray-100 pt-4">
+                  <h3 className="font-medium text-gray-800 mb-3">Recent Monthly Expense Entries</h3>
+                  <div className="space-y-2">
+                    {filteredMonthlyExpenses.slice(0, 8).map((expense) => (
+                      <div key={expense.id} className="flex flex-wrap items-center justify-between gap-3 bg-gray-50 rounded-xl px-3 py-2">
+                        <div>
+                          <p className="text-sm font-medium text-gray-800">
+                            {sanitizeDisplayText(expense.expenseTypeName)} · {sanitizeDisplayText(expense.shopName, expense.shopCode || 'Department')}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            {sanitizeDisplayText(expense.description)} · {expense.businessDate || 'No date'}
+                          </p>
+                        </div>
+                        <span className="text-sm font-bold text-red-600">{formatRs(expense.amount)}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )
+          )}
+        </div>
+      ) : (
+        <div className="card mb-6">
+          <div className="mb-5">
+            <h2 className="font-semibold text-gray-800">Monthly Breakdown by Expense Type</h2>
+            <p className="text-sm text-gray-500 mt-1">Y-axis shows dates (downward). X-axis shows total amount, broken down by expense type.</p>
+          </div>
+
+          {loadingMonthly ? <LoadingSpinner /> : (
+            monthlyGraphData.length === 0 || graphSeries.length === 0 ? (
+              <EmptyState icon={Receipt} title="No graph data" description="No non-zero monthly expenses were found for graphing." />
+            ) : (
+              <ResponsiveContainer width="100%" height={420}>
+                <BarChart data={monthlyGraphData} layout="vertical" margin={{ top: 10, right: 16, left: 16, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+                  <XAxis type="number" tick={{ fontSize: 11 }} />
+                  <YAxis type="category" dataKey="businessDate" width={90} tick={{ fontSize: 11 }} />
+                  <Tooltip formatter={(value) => formatRs(value)} />
+                  <Legend />
+                  {graphSeries.map((series) => (
+                    <Bar key={series.dataKey} dataKey={series.dataKey} name={series.name} stackId="dailyTotal" fill={series.color} />
+                  ))}
+                </BarChart>
+              </ResponsiveContainer>
+            )
+          )}
+        </div>
+      )}
 
       <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
         <div>
